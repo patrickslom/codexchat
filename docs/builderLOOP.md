@@ -217,3 +217,23 @@ docker compose up -d
   - `https://todo.flounderboard.com/ws` with upgrade headers ⚠️ (HTTP 404; websocket route not implemented/routed yet)
 - Notes/blockers:
   - Frontend task completed and deployed; API/WS smoke checks remain expectedly unavailable until backend TODO items are implemented.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/frontendTODO.md :: 1) Routing and App Shell :: Create route: `/login`.
+- Questions asked:
+  1) Should `/login` be a public page that redirects to `/chat` if a session already exists?
+  2) Should I include just the route/page scaffold now, or scaffold plus basic placeholder UI copy?
+  3) Do you want `/login` implemented as `app/login/page.tsx` with server component default (no client hooks yet)?
+- Assumptions:
+  - User wants the login experience to lead into chat behavior, while this task remains scoped to creating the `/login` route only.
+  - User requested scaffold plus basic UI now.
+  - Server-component implementation is acceptable; session redirect behavior is implemented using conservative cookie-key checks until backend auth naming is finalized.
+- Validation commands/results:
+  - `cd codexchat_front && npm run lint` ✅
+  - `cd codexchat_front && npm run build` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - `/chat` and conversation-history sidebar behavior are tracked by later frontend TODO items and were not implemented in this single-task run.

@@ -8,7 +8,7 @@
 - [x] Add API base URL and WebSocket URL environment wiring. (completed 2026-03-05)
 
 ## 1) Routing and App Shell
-- [ ] Create route: `/login`.
+- [x] Create route: `/login`. (completed 2026-03-05)
 - [ ] Create route: `/chat` (main app).
 - [ ] Create route: `/settings`.
 - [ ] Create route: `/settings/admin`.
