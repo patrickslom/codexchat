@@ -371,11 +371,67 @@ class HeartbeatRun(Base):
     )
 
 
+class ConversationLock(Base):
+    __tablename__ = "conversation_locks"
+    __table_args__ = (
+        CheckConstraint("resource_type = 'conversation'", name="ck_conversation_locks_resource_type"),
+        CheckConstraint("resource_id = conversation_id", name="ck_conversation_locks_resource_matches"),
+        CheckConstraint("stale_after_seconds >= 1", name="ck_conversation_locks_stale_after_seconds_min"),
+        CheckConstraint("expires_at >= locked_at", name="ck_conversation_locks_expires_after_locked"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    resource_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'conversation'"),
+    )
+    resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    locked_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    owner_token: Mapped[str] = mapped_column(String(128), nullable=False)
+    locked_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    last_heartbeat_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    stale_after_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("120"),
+    )
+    metadata_json: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+
+
 __all__ = [
     "AuditLog",
     "AuthAttempt",
     "Base",
     "Conversation",
+    "ConversationLock",
     "File",
     "HeartbeatJob",
     "HeartbeatRun",

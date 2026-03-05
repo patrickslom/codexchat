@@ -437,3 +437,20 @@ docker compose up -d
 - Smoke check status:
 - Notes/blockers:
   - Local Next.js build command is currently non-deterministic in this environment (hangs during production build stage).
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/dbTODO.md :: 5) Concurrency and Locks Schema
+- Questions asked:
+  1) Should `locked_by` reference `users.id` as a nullable UUID foreign key?
+  2) Should stale-lock recovery use an owner token plus `last_heartbeat_at`?
+  3) Should migration notes be added in `docs/dbMigrations.md` under a new subsection?
+- Assumptions:
+  - `locked_by` is nullable UUID FK to `users.id`; user locks set `locked_by=user_id`, system/worker locks set `locked_by=NULL` with owner details in `metadata_json`.
+  - Stale recovery uses `owner_token` compare-and-release plus `last_heartbeat_at` heartbeats; stale threshold is TTL-based.
+  - Migration documentation includes schema changes, TTL defaults, recovery procedure, and required lock indexes.
+- Validation commands/results:
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:

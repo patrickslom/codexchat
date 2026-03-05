@@ -44,9 +44,9 @@
 - [x] `id`, `heartbeat_job_id`, `started_at`, `finished_at`, `status`, `error_text`, `created_at`. (completed 2026-03-05)
 
 ## 5) Concurrency and Locks Schema
-- [ ] Create `conversation_locks` table (or equivalent lock record) for per-thread active run protection.
-- [ ] Add fields: `conversation_id` (unique), `locked_by`, `locked_at`, `expires_at`.
-- [ ] Add stale-lock recovery strategy fields and migration notes.
+- [x] Create `conversation_locks` table (or equivalent lock record) for per-thread active run protection. (completed 2026-03-05)
+- [x] Add fields: `conversation_id` (unique), `locked_by`, `locked_at`, `expires_at`. (completed 2026-03-05)
+- [x] Add stale-lock recovery strategy fields and migration notes. (completed 2026-03-05)
 
 ## 6) Archive/Soft Delete Behavior
 - [ ] Standardize `archived_at` nullable timestamp semantics across archivable tables.
