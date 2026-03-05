@@ -1,7 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import WinkingLogo from "./components/winking-logo";
+import { hasSessionCookie } from "@/lib/auth-session";
 
-export default function Home() {
+export default async function Home() {
+  if (await hasSessionCookie()) {
+    redirect("/chat");
+  }
+
   return (
     <main className="min-h-screen bg-background px-6 py-20 text-foreground">
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-8">

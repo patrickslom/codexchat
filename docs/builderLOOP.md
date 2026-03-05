@@ -417,3 +417,23 @@ docker compose up -d
 - Notes/blockers:
   - First smoke attempt briefly returned `502` while Traefik/backend routing converged after container recreation; subsequent retries were stable and passing.
   - Websocket auth in this section uses a transitional cookie format (`codexchat_session` as user UUID) until full signed session persistence is implemented in section 2.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/frontendTODO.md :: 1) Routing and App Shell (remaining items)
+- Questions asked:
+  1) Should `/chat` be the post-login default landing page for authenticated users?
+  2) For `/settings/admin`, should non-admin users be redirected to `/settings`?
+  3) Should logout call backend `POST /api/auth/logout`, clear the session cookie, then redirect to `/login`?
+- Assumptions:
+  - Authenticated users should default to `/chat` including authenticated visits to `/`.
+  - Non-admin access to `/settings/admin` should be redirected to `/settings`.
+  - Logout should call backend `/api/auth/logout`, expire frontend session cookies, and redirect to `/login?logged_out=1`.
+- Validation commands/results:
+  - `cd codexchat_front && timeout 180 npm run lint` ✅
+  - `cd codexchat_front && npm run build` ⚠️ hangs in this environment during optimized production build (multiple retries; process remained active without completion output, manually terminated).
+- Commit:
+- Push:
+- Deploy status: assumed completed by operator per user note (containers rebuilt/restarted externally during this run).
+- Smoke check status:
+- Notes/blockers:
+  - Local Next.js build command is currently non-deterministic in this environment (hangs during production build stage).

@@ -9,11 +9,11 @@
 
 ## 1) Routing and App Shell
 - [x] Create route: `/login`. (completed 2026-03-05)
-- [ ] Create route: `/chat` (main app).
-- [ ] Create route: `/settings`.
-- [ ] Create route: `/settings/admin`.
-- [ ] Add auth guard redirect logic (`/chat` and `/settings*` require session).
-- [ ] Add logout action in shell.
+- [x] Create route: `/chat` (main app). (completed 2026-03-05)
+- [x] Create route: `/settings`. (completed 2026-03-05)
+- [x] Create route: `/settings/admin`. (completed 2026-03-05)
+- [x] Add auth guard redirect logic (`/chat` and `/settings*` require session). (completed 2026-03-05)
+- [x] Add logout action in shell. (completed 2026-03-05)
 
 ## 2) Theme and Visual System
 - [ ] Implement ChatGPT-like structure and spacing system (desktop + mobile).
