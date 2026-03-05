@@ -21,6 +21,9 @@
 - Do not print secrets from `.env` or secret values in logs/messages.
 
 ## Code and Scope Rules
+- Consistency is mandatory across all work (code, docs, infra, scripts, and process updates):
+  - Before creating anything new, first check whether an existing setup/pattern already exists and follow it.
+  - If no suitable existing setup/pattern exists, explicitly state that before introducing a new pattern.
 - Keep changes scoped to the selected task; do not bundle unrelated refactors.
 - Do not remove existing warnings, limits, or lock behavior without explicit user approval.
 - Respect core defaults unless user changes them:

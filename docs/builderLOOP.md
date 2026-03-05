@@ -132,3 +132,20 @@ docker compose up -d
   - `https://questflow.net` ✅ (HTTP 200)
 - Notes/blockers:
   - `questflow.com` and `www.questflow.com` currently resolve to external IPs (`13.248.169.48`, `76.223.54.146`), so LE cert validation for `.com` cannot occur on this VPS until DNS is updated.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/frontendTODO.md :: 0) Project Bootstrap :: Set up base folder structure: `app/`, `components/`, `lib/`, `hooks/`, `types/`.
+- Questions asked:
+  1) Should folders be top-level in `codexchat_front/`?
+  2) Add `.gitkeep` placeholders in empty folders?
+  3) Add path aliases for these folders in `tsconfig.json`?
+- Assumptions:
+  - User confirmed all three questions.
+  - Existing `app/` folder from Next.js scaffold remains as the app root.
+  - Empty base folders should be tracked via `.gitkeep` placeholders.
+- Validation commands/results:
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
