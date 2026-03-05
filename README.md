@@ -1,10 +1,13 @@
+<p align="center">
+  <img src="codexchat_front/public/brand/gnome-default.png" alt="Codex Chat logo" width="240" />
+</p>
+
 # Codex Chat MVP
 
 Self-hosted ChatGPT-style web app for running Codex on your VPS.
 
 ## Project Info
 
-- Current project domain: `www.questflow.net`
 - GitHub repository: `https://github.com/patrickslom/codexchat`
 
 ## Current Landing Page Copy
