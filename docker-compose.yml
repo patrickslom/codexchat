@@ -1,4 +1,46 @@
 services:
+  codexchat_db:
+    container_name: codexchat_db
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-codexchat}
+      POSTGRES_USER: ${POSTGRES_USER:-codexchat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-codexchat}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-codexchat} -d ${POSTGRES_DB:-codexchat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - codexchat_db_data:/var/lib/postgresql/data
+    networks:
+      - codexchat_internal
+
+  codexchat_back:
+    container_name: codexchat_back
+    build:
+      context: ./codexchat_back
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      codexchat_db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://codexchat:codexchat@codexchat_db:5432/codexchat}
+    networks:
+      - n8n_default
+      - codexchat_internal
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=n8n_default
+      - traefik.http.routers.codexchat-back.entrypoints=web,websecure
+      - traefik.http.routers.codexchat-back.rule=(Host(`questflow.net`) || Host(`www.questflow.net`) || Host(`todo.flounderboard.com`)) && (PathPrefix(`/api`) || PathPrefix(`/ws`))
+      - traefik.http.routers.codexchat-back.priority=300
+      - traefik.http.routers.codexchat-back.tls=true
+      - traefik.http.routers.codexchat-back.tls.certresolver=mytlschallenge
+      - traefik.http.services.codexchat-back.loadbalancer.server.port=8000
+
   codexchat_front:
     container_name: codexchat_front
     build:
@@ -24,3 +66,7 @@ services:
 networks:
   n8n_default:
     external: true
+  codexchat_internal:
+
+volumes:
+  codexchat_db_data:

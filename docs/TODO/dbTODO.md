@@ -1,11 +1,11 @@
 # Database TODO
 
 ## 0) Foundation and Tooling
-- [ ] Set up SQLAlchemy models and DB session management for Postgres.
-- [ ] Set up Alembic migration environment.
-- [ ] Create initial migration baseline and versioning workflow docs.
-- [ ] Add DB config validation from environment (`DATABASE_URL`).
-- [ ] Add startup DB connectivity check.
+- [x] Set up SQLAlchemy models and DB session management for Postgres. (completed 2026-03-05)
+- [x] Set up Alembic migration environment. (completed 2026-03-05)
+- [x] Create initial migration baseline and versioning workflow docs. (completed 2026-03-05)
+- [x] Add DB config validation from environment (`DATABASE_URL`). (completed 2026-03-05)
+- [x] Add startup DB connectivity check. (completed 2026-03-05)
 
 ## 1) Core Schema (Global Shared Model)
 - [ ] Create `users` table:

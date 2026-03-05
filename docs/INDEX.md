@@ -15,6 +15,9 @@
 - [dbTODO.md](/root/codexchat/docs/TODO/dbTODO.md)
   Ordered database checklist (Postgres schema, Alembic migrations, soft-delete archive model, indexes, integrity, maintenance).
 
+- [dbMigrations.md](/root/codexchat/docs/dbMigrations.md)
+  Database migration workflow, baseline revision details, and Alembic versioning conventions.
+
 - [builderLOOP.md](/root/codexchat/docs/builderLOOP.md)
   Agent execution loop for completing one task at a time: ask questions, build, validate, commit/push, deploy, smoke-check, stop.
 

@@ -237,3 +237,23 @@ docker compose up -d
 - Smoke check status:
 - Notes/blockers:
   - `/chat` and conversation-history sidebar behavior are tracked by later frontend TODO items and were not implemented in this single-task run.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/dbTODO.md :: 0) Foundation and Tooling
+- Questions asked:
+  1) Should I implement this in the existing backend service at `codexchat_back` (SQLAlchemy + Alembic there)?
+  2) For startup DB connectivity, do you want hard fail on app boot if DB is unreachable?
+  3) Should I add a short DB workflow doc under `docs/` as part of the “baseline and versioning workflow docs” item?
+- Assumptions:
+  - User approved implementing DB foundation in `codexchat_back`.
+  - API startup should fail fast when DB connectivity check fails.
+  - Migration baseline/versioning workflow documentation is included in `docs/dbMigrations.md`.
+- Validation commands/results:
+  - `cd codexchat_back && python3 -m compileall app alembic` ✅
+  - `cd /root/codexchat && docker compose config` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - Unrelated workspace changes existed and were intentionally excluded from staging/commit.
