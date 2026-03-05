@@ -20,10 +20,10 @@
 - [x] `id`, `message_id`, `file_id`, `created_at`. (completed 2026-03-05)
 
 ## 2) Auth and Session Support Tables
-- [ ] Create `sessions` table for cookie auth sessions.
-- [ ] Add session indexes for lookup and expiration cleanup.
-- [ ] Create `auth_attempts` table for lockout fallback when Redis is absent.
-- [ ] Add fields: `key`, `fail_count`, `ban_level`, `ban_until`, `last_failed_at`, `updated_at`.
+- [x] Create `sessions` table for cookie auth sessions. (completed 2026-03-05)
+- [x] Add session indexes for lookup and expiration cleanup. (completed 2026-03-05)
+- [x] Create `auth_attempts` table for lockout fallback when Redis is absent. (completed 2026-03-05)
+- [x] Add fields: `key`, `fail_count`, `ban_level`, `ban_until`, `last_failed_at`, `updated_at`. (completed 2026-03-05)
 
 ## 3) Settings and Admin Tables
 - [ ] Create `settings` table (global app settings + defaults).

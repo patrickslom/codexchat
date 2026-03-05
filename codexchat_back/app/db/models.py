@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BIGINT, Boolean, CheckConstraint, String, Text, text
+from sqlalchemy import BIGINT, Boolean, CheckConstraint, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -131,11 +131,67 @@ class MessageFile(Base):
     )
 
 
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
+
+class AuthAttempt(Base):
+    __tablename__ = "auth_attempts"
+    __table_args__ = (
+        CheckConstraint("fail_count >= 0", name="ck_auth_attempts_fail_count_non_negative"),
+        CheckConstraint("ban_level >= 0", name="ck_auth_attempts_ban_level_non_negative"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    key: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    fail_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    ban_level: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    ban_until: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    last_failed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
+    "AuthAttempt",
     "Base",
     "Conversation",
     "File",
     "Message",
     "MessageFile",
+    "Session",
     "User",
 ]
