@@ -16,12 +16,19 @@ export default function Home() {
             CodexChat
           </p>
         </div>
-        <h1 className="max-w-2xl text-4xl font-semibold tracking-tight sm:text-6xl">
-          Frontend bootstrap is live.
+
+        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
+          From fresh VPS to live Codex chat in minutes.
         </h1>
-        <p className="max-w-2xl text-base text-zinc-700 sm:text-lg">
-          This is the initial deployed shell for the CodexChat web app. Next
-          updates will add login, chat, settings, and mobile-first app layout.
+
+        <p className="max-w-3xl text-base text-zinc-700 sm:text-lg">
+          Run the installer, open your domain, log in, and start streaming
+          Codex responses from desktop or phone.
+        </p>
+
+        <p className="max-w-3xl text-base text-zinc-700 sm:text-lg">
+          No Telegram flow. Just a clean web app for real chat workflows and
+          file-based collaboration.
         </p>
       </section>
     </main>

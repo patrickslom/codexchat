@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CodexChat",
-  description: "CodexChat frontend bootstrap",
+  description: "From fresh VPS to live Codex chat in minutes",
   manifest: "/site.webmanifest",
   icons: {
     icon: [
