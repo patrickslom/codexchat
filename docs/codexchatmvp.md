@@ -406,7 +406,7 @@ Or:
 - Temporary routing override for active development:
   - `todo.flounderboard.com` is routed to `codexchat_front`
 - Purpose:
-  - provide a stable HTTPS hostname while `questflow.com` DNS propagation/target updates are pending
+  - provide a stable HTTPS hostname for CodexChat while primary production DNS/target updates are pending
 - This is deployment-specific and not part of the public install default.
 
 ### Edge rate limits (recommended)

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Questflow",
-  description: "Codex Chat frontend bootstrap",
+  title: "CodexChat",
+  description: "CodexChat frontend bootstrap",
 };
 
 export default function RootLayout({

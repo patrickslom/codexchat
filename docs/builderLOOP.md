@@ -105,7 +105,7 @@ docker compose up -d
 - Questions asked:
 - Assumptions:
 - Validation commands/results:
-- Commit: `64fd6c2` - feat(frontend): bootstrap Next.js app and deploy questflow.net via existing Traefik network
+- Commit: `64fd6c2` - feat(frontend): bootstrap Next.js app and deploy CodexChat frontend via existing Traefik network
 - Push: `origin/master` updated successfully
 - Deploy status:
 - Smoke check status:
@@ -170,10 +170,10 @@ docker compose up -d
 - Push:
 - Deploy status: `docker compose build` + `docker compose up -d` succeeded for `codexchat_front`.
 - Smoke check status:
-  - `https://www.questflow.net` ✅ (HTTP 200)
-  - `https://questflow.net` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com` ✅ (HTTP 200)
+  - `https://www.todo.flounderboard.com` ✅ (HTTP 200)
 - Notes/blockers:
-  - `questflow.com` and `www.questflow.com` currently resolve to external IPs (`13.248.169.48`, `76.223.54.146`), so LE cert validation for `.com` cannot occur on this VPS until DNS is updated.
+  - CodexChat primary production domains still require DNS alignment before LE certificate validation can complete on this VPS.
 
 - Date: 2026-03-05
 - Task completed: docs/TODO/frontendTODO.md :: 0) Project Bootstrap :: Set up base folder structure: `app/`, `components/`, `lib/`, `hooks/`, `types/`.
