@@ -274,11 +274,17 @@ docker compose up -d
   - `cd codexchat_back && python3 -m compileall app alembic` ✅
   - `docker compose run --rm --build codexchat_back alembic upgrade head` ✅ (upgraded `20260305_03` -> `20260305_04`)
   - `docker compose run --rm codexchat_back alembic current` ✅ (`20260305_04 (head)`)
-- Commit:
-- Push:
+- Commit: `eb0792c` - feat(db): add settings and audit logs schema with guarded defaults
+- Push: `origin/master` updated successfully
 - Deploy status:
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
 - Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/ws` with websocket upgrade headers ✅ (HTTP 403 expected without auth session cookie)
 - Notes/blockers:
+  - Initial post-deploy probe briefly returned `502` for `/api/health` and `/ws`; checks passed after services fully stabilized.
 
 - Date: 2026-03-05
 - Task completed: docs/TODO/dbTODO.md :: 1) Core Schema (Global Shared Model)
