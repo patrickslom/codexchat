@@ -22,6 +22,11 @@
 - [ ] Ensure black/white-first palette in both themes.
 - [ ] Add typography and code block styling.
 
+## 2.1) Branding Icons + Favicons
+- [x] Flatten favicon/icon assets into `public/`, wire metadata in `app/layout.tsx`, and remove default `app/favicon.ico`. (completed 2026-03-05)
+- [ ] Verify browser tab icon, iOS home screen icon, and PWA manifest icons resolve in local dev and production build.
+- [ ] Ensure browser tab icon, iOS home screen icon, and PWA manifest icons resolve in local dev and production build.
+
 ## 3) Login UX
 - [ ] Build login form (email/password).
 - [ ] Connect login form to backend session endpoint.
