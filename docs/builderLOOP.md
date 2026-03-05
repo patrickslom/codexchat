@@ -124,11 +124,15 @@ docker compose up -d
 - Validation commands/results:
   - `cd codexchat_front && npm run lint` ✅
   - `cd codexchat_front && npm run build` ✅
-- Commit:
-- Push:
-- Deploy status:
+- Commit: `76648af` - feat(frontend): add global black/white theme tokens with dark-mode variables
+- Push: `origin/master` updated successfully
+- Deploy status: `docker compose build` + `docker compose up -d` succeeded for `codexchat_front`.
 - Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ⚠️ (HTTP 404; backend health endpoint not available yet)
+  - `https://todo.flounderboard.com/ws` with upgrade headers ⚠️ (HTTP 404; websocket route not available yet)
 - Notes/blockers:
+  - Frontend-only run; backend routing endpoints are pending backend TODO implementation.
 
 - Date: 2026-03-05
 - Task completed: docs/TODO/frontendTODO.md :: 0) Project Bootstrap :: Create Next.js app with TypeScript and Tailwind in `codexchat_front`.
