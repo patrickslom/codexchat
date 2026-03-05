@@ -27,6 +27,7 @@
 - Consistency is mandatory across all work (code, docs, infra, scripts, and process updates):
   - Before creating anything new, first check whether an existing setup/pattern already exists and follow it.
   - If no suitable existing setup/pattern exists, explicitly state that before introducing a new pattern.
+- All user-facing pages and reusable UI components must be responsive and verified for desktop, tablet, and phone viewports.
 - Keep changes scoped to the selected task; do not bundle unrelated refactors.
 - Do not remove existing warnings, limits, or lock behavior without explicit user approval.
 - Respect core defaults unless user changes them:
