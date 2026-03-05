@@ -228,16 +228,16 @@ docker compose up -d
   - `docker compose run --rm --build codexchat_back alembic upgrade head` ✅ (upgraded `20260305_02` -> `20260305_03`)
   - `docker compose run --rm codexchat_back alembic current` ✅ (`20260305_03 (head)`)
 - Commit: `fd4f186` - feat(db): add sessions and auth_attempts schema for session auth fallback
-- Push:
+- Push: `origin/master` updated successfully (to `32c1817`)
 - Deploy status:
-- Smoke check status:
-- Notes/blockers:
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
 - Smoke check status:
   - `https://todo.flounderboard.com/` ✅ (HTTP 200)
-  - `https://todo.flounderboard.com/api/health` ⚠️ (HTTP 404; backend endpoint not implemented/routed yet)
-  - `https://todo.flounderboard.com/ws` with upgrade headers ⚠️ (HTTP 404; websocket route not implemented/routed yet)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/ws` with websocket upgrade headers ✅ (HTTP 403 expected without auth session cookie)
 - Notes/blockers:
-  - Frontend task completed and deployed; API/WS smoke checks remain expectedly unavailable until backend TODO items are implemented.
+  - Initial smoke probe briefly returned `502` during service restart; subsequent checks passed after containers became fully ready.
 
 - Date: 2026-03-05
 - Task completed: docs/TODO/frontendTODO.md :: 1) Routing and App Shell :: Create route: `/login`.
