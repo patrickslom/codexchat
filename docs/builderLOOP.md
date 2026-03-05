@@ -239,6 +239,33 @@ docker compose up -d
   - `/chat` and conversation-history sidebar behavior are tracked by later frontend TODO items and were not implemented in this single-task run.
 
 - Date: 2026-03-05
+- Task completed: docs/TODO/dbTODO.md :: 1) Core Schema (Global Shared Model)
+- Questions asked:
+  1) Should IDs for these tables use `UUID` (instead of integer/bigint)?
+  2) Should `role` columns be PostgreSQL `ENUM` types or plain `TEXT` with check constraints?
+  3) Should `created_at/updated_at` use timezone-aware timestamps (`TIMESTAMPTZ`) with DB defaults (`now()`)?
+- Assumptions:
+  - IDs use UUID primary keys generated in DB via `gen_random_uuid()` (pgcrypto).
+  - Role/status style fields use `TEXT` + `CHECK` constraints for MVP migration flexibility.
+  - `created_at` and `updated_at` use `TIMESTAMPTZ NOT NULL DEFAULT now()`.
+  - `updated_at` is maintained in DB via trigger (implemented for tables that include an `updated_at` column in this section).
+- Validation commands/results:
+  - `cd codexchat_back && python3 -m compileall app alembic` ✅
+  - `docker compose run --rm --build codexchat_back alembic upgrade head` ✅ (upgraded `20260305_01` -> `20260305_02`)
+  - `docker compose run --rm codexchat_back alembic current` ✅ (`20260305_02 (head)`)
+- Commit: `db86e53` - feat(db): add core shared schema tables with UUID keys and timestamp triggers
+- Push: `origin/master` updated successfully
+- Deploy status:
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
+- Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/ws` with websocket upgrade headers ⚠️ (HTTP 404; websocket endpoint pending backend websocket implementation)
+- Notes/blockers:
+  - Websocket upgrade route currently returns `404`; backend websocket feature work remains in backend TODO scope.
+
+- Date: 2026-03-05
 - Task completed: docs/TODO/dbTODO.md :: 0) Foundation and Tooling
 - Questions asked:
   1) Should I implement this in the existing backend service at `codexchat_back` (SQLAlchemy + Alembic there)?
