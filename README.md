@@ -55,6 +55,14 @@ Default service/container names:
 
 ## Quick Start
 
+One-liner install:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/patrickslom/codexchat/master/scripts/install.sh)
+```
+
+Manual install:
+
 ```bash
 git clone <YOUR_REPO_URL>
 cd <YOUR_REPO_DIR>
@@ -80,6 +88,10 @@ What `./scripts/setup.sh` does:
 - auto-detects Traefik Docker network
 - offers managed Traefik install if missing
 - starts containers (if compose file exists)
+
+What `./scripts/install.sh` does:
+- clones/updates the repo to `~/codexchat` by default
+- then launches `./scripts/setup.sh`
 
 ## .env keys (minimum)
 
@@ -117,6 +129,13 @@ Managed Traefik installer:
 Managed Codex installer:
 - `./scripts/install-codex.sh` installs Codex CLI using npm (`@openai/codex`)
 - setup then requires login before continuing
+
+One-liner bootstrap installer:
+- `./scripts/install.sh` is the script used by the `curl | bash` installation path
+- supports overrides:
+  - `CODEXCHAT_DIR` for install location
+  - `REPO_URL` for custom fork
+  - `BRANCH` for non-master install
 
 ## Install Walkthrough
 
