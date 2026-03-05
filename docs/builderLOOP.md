@@ -110,3 +110,25 @@ docker compose up -d
 - Deploy status:
 - Smoke check status:
 - Notes/blockers:
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/frontendTODO.md :: 0) Project Bootstrap :: Create Next.js app with TypeScript and Tailwind in `codexchat_front`.
+- Questions asked:
+  1) Start with frontend bootstrap first despite default DB/backend priority?
+  2) Scaffold `codexchat_front/` with Next.js App Router + Tailwind?
+  3) Also handle HTTPS certificate in same run or frontend-only?
+- Assumptions:
+  - User approved frontend-first execution order for this run.
+  - User approved Next.js + TypeScript + Tailwind scaffold.
+  - Existing Traefik network is `n8n_default`; do not create a new network.
+- Validation commands/results:
+  - `cd codexchat_front && npm run lint` ✅
+  - `cd codexchat_front && npm run build` ✅
+- Commit:
+- Push:
+- Deploy status: `docker compose build` + `docker compose up -d` succeeded for `codexchat_front`.
+- Smoke check status:
+  - `https://www.questflow.net` ✅ (HTTP 200)
+  - `https://questflow.net` ✅ (HTTP 200)
+- Notes/blockers:
+  - `questflow.com` and `www.questflow.com` currently resolve to external IPs (`13.248.169.48`, `76.223.54.146`), so LE cert validation for `.com` cannot occur on this VPS until DNS is updated.
