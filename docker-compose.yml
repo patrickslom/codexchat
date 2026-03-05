@@ -11,7 +11,8 @@ services:
       - traefik.enable=true
       - traefik.docker.network=n8n_default
       - traefik.http.routers.codexchat-front.entrypoints=web,websecure
-      - traefik.http.routers.codexchat-front.rule=Host(`questflow.net`) || Host(`www.questflow.net`)
+      - traefik.http.routers.codexchat-front.rule=Host(`questflow.net`) || Host(`www.questflow.net`) || Host(`todo.flounderboard.com`)
+      - traefik.http.routers.codexchat-front.priority=200
       - traefik.http.routers.codexchat-front.tls=true
       - traefik.http.routers.codexchat-front.tls.certresolver=mytlschallenge
       - traefik.http.services.codexchat-front.loadbalancer.server.port=3000
