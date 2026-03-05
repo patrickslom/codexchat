@@ -21,6 +21,7 @@
 - [ ] Implement dark mode toggle persisted to local storage.
 - [ ] Ensure black/white-first palette in both themes.
 - [ ] Add typography and code block styling.
+- [x] Add brand logo beside `CodexChat` on the landing page header and scale for visibility. (completed 2026-03-05)
 
 ## 2.1) Branding Icons + Favicons
 - [x] Flatten favicon/icon assets into `public/`, wire metadata in `app/layout.tsx`, and remove default `app/favicon.ico`. (completed 2026-03-05)
