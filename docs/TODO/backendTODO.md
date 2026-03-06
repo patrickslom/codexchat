@@ -41,11 +41,11 @@
 - [x] Add conversation activity timestamps updates on each turn. (completed 2026-03-06)
 
 ## 5) WebSocket Messaging and Streaming
-- [ ] Implement websocket auth/session check for `/ws`.
-- [ ] Implement inbound events: `send_message`, `resume`.
-- [ ] Implement outbound events: `assistant_delta`, `assistant_done`, `error`.
-- [ ] Add websocket connection lifecycle handling (connect/disconnect/reconnect-safe state).
-- [ ] Add error mapping from Codex/runtime failures to websocket error events.
+- [x] Implement websocket auth/session check for `/ws`. (completed 2026-03-06)
+- [x] Implement inbound events: `send_message`, `resume`. (completed 2026-03-06)
+- [x] Implement outbound events: `assistant_delta`, `assistant_done`, `error`. (completed 2026-03-06)
+- [x] Add websocket connection lifecycle handling (connect/disconnect/reconnect-safe state). (completed 2026-03-06)
+- [x] Add error mapping from Codex/runtime failures to websocket error events. (completed 2026-03-06)
 
 ## 6) Codex Bridge (API Service)
 - [ ] Build Codex process runner using `codex app-server --listen stdio://`.

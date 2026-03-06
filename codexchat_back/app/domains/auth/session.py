@@ -6,6 +6,7 @@ import hmac
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketException, status
@@ -223,7 +224,67 @@ class SessionManager:
 session_manager = SessionManager()
 
 
+def _normalize_host_header(value: str | None) -> str | None:
+    if not value:
+        return None
+    first = value.split(",", maxsplit=1)[0].strip().lower()
+    if not first:
+        return None
+    if ":" in first and not first.startswith("["):
+        first = first.split(":", maxsplit=1)[0]
+    return first or None
+
+
+def _validate_websocket_host_and_origin(websocket: WebSocket) -> None:
+    settings = get_settings()
+    request_host = _normalize_host_header(
+        websocket.headers.get("x-forwarded-host") or websocket.headers.get("host")
+    )
+    if request_host is None:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="FORBIDDEN_HOST",
+        )
+
+    allowed_hosts = {host.lower() for host in settings.allowed_hosts}
+    if "*" not in allowed_hosts and request_host not in allowed_hosts:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="FORBIDDEN_HOST",
+        )
+
+    origin = websocket.headers.get("origin")
+    if not origin:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="FORBIDDEN_ORIGIN",
+        )
+
+    parsed_origin = urlparse(origin)
+    origin_host = parsed_origin.hostname.lower() if parsed_origin.hostname else None
+    if origin_host is None:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="FORBIDDEN_ORIGIN",
+        )
+
+    if origin_host != request_host:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="FORBIDDEN_ORIGIN",
+        )
+
+    allowed_origins = {allowed.lower() for allowed in settings.ws_allowed_origins}
+    normalized_origin = origin.strip().lower()
+    if allowed_origins and normalized_origin not in allowed_origins:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="FORBIDDEN_ORIGIN",
+        )
+
+
 def authenticate_websocket(websocket: WebSocket) -> User:
+    _validate_websocket_host_and_origin(websocket)
     with SessionLocal() as db:
         auth_session = session_manager.resolve_session(
             db,

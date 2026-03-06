@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     session_cookie_name: str = Field(default="codexchat_session", alias="SESSION_COOKIE_NAME")
     csrf_cookie_name: str = Field(default="codexchat_csrf", alias="CSRF_COOKIE_NAME")
     session_ttl_hours: int = Field(default=168, alias="SESSION_TTL_HOURS")
+    allowed_hosts: tuple[str, ...] = Field(default=("*",), alias="ALLOWED_HOSTS")
+    ws_allowed_origins: tuple[str, ...] = Field(default=tuple(), alias="WS_ALLOWED_ORIGINS")
     enable_public_registration: bool = Field(default=False, alias="ENABLE_PUBLIC_REGISTRATION")
     admin_bootstrap_email: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_EMAIL")
     admin_bootstrap_password: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_PASSWORD")
@@ -66,6 +68,35 @@ class Settings(BaseSettings):
         if value < 1:
             raise ValueError("SESSION_TTL_HOURS must be >= 1")
         return value
+
+    @field_validator("allowed_hosts", mode="before")
+    @classmethod
+    def validate_allowed_hosts(cls, value: tuple[str, ...] | list[str] | str) -> tuple[str, ...]:
+        if isinstance(value, str):
+            parts = [item.strip().lower() for item in value.split(",") if item.strip()]
+            return tuple(parts or ["*"])
+
+        if isinstance(value, (tuple, list)):
+            normalized = [str(item).strip().lower() for item in value if str(item).strip()]
+            return tuple(normalized or ["*"])
+
+        raise ValueError("ALLOWED_HOSTS must be a comma-separated list or string tuple")
+
+    @field_validator("ws_allowed_origins", mode="before")
+    @classmethod
+    def validate_ws_allowed_origins(
+        cls,
+        value: tuple[str, ...] | list[str] | str,
+    ) -> tuple[str, ...]:
+        if isinstance(value, str):
+            parts = [item.strip().lower() for item in value.split(",") if item.strip()]
+            return tuple(parts)
+
+        if isinstance(value, (tuple, list)):
+            normalized = [str(item).strip().lower() for item in value if str(item).strip()]
+            return tuple(normalized)
+
+        raise ValueError("WS_ALLOWED_ORIGINS must be a comma-separated list or string tuple")
 
     @field_validator("log_level")
     @classmethod

@@ -157,6 +157,25 @@ EOF
 - Smoke check status:
 - Notes/blockers:
 
+- Date: 2026-03-06
+- Task completed: docs/TODO/backendTODO.md :: 5) WebSocket Messaging and Streaming
+- Questions asked:
+  1) Should `resume` replay buffered deltas for an in-flight turn, or only return the latest persisted assistant message state?
+  2) For websocket auth, should I require an existing session cookie only, or session cookie + CSRF token validation on connect?
+  3) Do you want strict event schema validation (reject unknown fields/event types with structured `error` events), or permissive parsing for MVP?
+- Assumptions:
+  - `resume` returns the latest persisted assistant message state and does not replay historical deltas.
+  - WebSocket connect auth uses authenticated session cookie only; no CSRF check on websocket connect.
+  - WebSocket security enforces origin + allowed-host validation and rejects unauthorized upgrades.
+  - Event validation is strict for supported event type + required fields, while allowing harmless extra fields.
+- Validation commands/results:
+  - `cd codexchat_back && python3 -m compileall app` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+
 - Date: 2026-03-05
 - Task completed: docs/TODO/frontendTODO.md :: 0) Project Bootstrap :: Add app shell layout with responsive viewport and safe-area handling.
 - Questions asked:

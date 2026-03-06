@@ -16,6 +16,7 @@ from app.core.errors import AppError, build_error_envelope
 from app.core.logging import RequestContextLoggingMiddleware, configure_logging, request_id_ctx
 from app.domains.auth.password import ensure_password_backend
 from app.domains.auth.session import authenticate_websocket
+from app.domains.chat.websocket import chat_websocket_service
 from app.db.bootstrap import seed_defaults
 from app.db.migration_guard import assert_database_at_head
 from app.db.session import engine
@@ -168,14 +169,4 @@ def api_health() -> dict[str, str]:
 @app.websocket("/ws")
 async def websocket_probe(websocket: WebSocket) -> None:
     user = authenticate_websocket(websocket)
-    logger.info(
-        "websocket_authenticated",
-        extra={
-            "event_data": {
-                "user_id": str(user.id),
-                "path": websocket.url.path,
-            }
-        },
-    )
-    await websocket.accept()
-    await websocket.close(code=1000)
+    await chat_websocket_service.handle_connection(websocket, user=user)
