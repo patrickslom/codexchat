@@ -15,11 +15,11 @@
 - [x] Add OpenAPI tags grouped by domain. (completed 2026-03-05)
 
 ## 2) Core Security and Sessions
-- [ ] Implement cookie-based session auth with secure/httpOnly cookies.
-- [ ] Add CSRF protection strategy for cookie-authenticated endpoints.
-- [ ] Implement password hashing (Argon2id preferred).
-- [ ] Implement login lockout counters (Redis preferred, DB fallback).
-- [ ] Add generic auth error responses (no user enumeration).
+- [x] Implement cookie-based session auth with secure/httpOnly cookies. (completed 2026-03-05)
+- [x] Add CSRF protection strategy for cookie-authenticated endpoints. (completed 2026-03-05)
+- [x] Implement password hashing (Argon2id preferred). (completed 2026-03-05)
+- [x] Implement login lockout counters (Redis preferred, DB fallback). (completed 2026-03-05)
+- [x] Add generic auth error responses (no user enumeration). (completed 2026-03-05)
 
 ## 3) Admin Bootstrap and User Management
 - [ ] Implement startup bootstrap for first admin (env or CLI path).

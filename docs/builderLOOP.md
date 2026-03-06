@@ -582,3 +582,28 @@ EOF
   - `cd codexchat_front && npm run check:icons -- --base-url=https://todo.flounderboard.com` ✅
 - Notes/blockers:
   - `docs/TODO/frontendTODO.md` contained unrelated pre-existing unstaged changes in section `2)`; commit staging was narrowed to only section `2.1)` updates for this run.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/backendTODO.md :: 2) Core Security and Sessions
+- Questions asked:
+  1) Should sessions use signed server-side session ID cookies with Redis preferred and DB fallback?
+  2) Should CSRF use double-submit cookie+header on state-changing `/api/*` routes excluding login/logout (and optional register)?
+  3) Should Argon2id be mandatory with startup fail-fast when unavailable?
+- Assumptions:
+  - Session cookies are opaque (`session_id.signature`), `httpOnly`, `Secure`, and `SameSite=Lax`, with all session/user state stored server-side.
+  - CSRF protection is enforced for all `POST|PUT|PATCH|DELETE` under `/api/*`, excluding `/api/auth/login`, `/api/auth/logout`, and `/api/auth/register`.
+  - WebSocket auth remains cookie/session-based at upgrade and is not CSRF-protected.
+  - Lockout counters prefer Redis when reachable and fall back to Postgres when Redis is unavailable.
+  - Argon2id is the only active password hashing backend and must be importable at startup.
+- Validation commands/results:
+  - `cd codexchat_back && python3 -m compileall app` ✅
+  - `cd codexchat_back && python3 -m compileall alembic` ✅
+  - `cd codexchat_back && python3 - <<'PY' ... PY` ⚠️ failed locally (`ModuleNotFoundError: argon2`) because host Python env is missing deps
+  - `docker compose run --rm codexchat_back python -m compileall app` ✅
+  - `docker compose run --rm codexchat_back python - <<'PY' from app.main import app ... PY` ✅ (`startup_import_ok True`)
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - Local host Python environment does not include new backend dependencies; runtime validation was executed in Docker instead.

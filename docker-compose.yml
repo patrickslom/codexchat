@@ -28,9 +28,14 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://codexchat:codexchat@codexchat_db:5432/codexchat}
+      REDIS_URL: ${REDIS_URL:-}
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_PRETTY: ${LOG_PRETTY:-false}
+      SESSION_SECRET: ${SESSION_SECRET:-replace_with_long_random_secret_at_least_32_chars}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-codexchat_session}
+      CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-codexchat_csrf}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
     networks:
       - n8n_default
       - codexchat_internal
@@ -56,9 +61,14 @@ services:
     command: ["uvicorn", "app.worker.main:app", "--host", "0.0.0.0", "--port", "8001"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://codexchat:codexchat@codexchat_db:5432/codexchat}
+      REDIS_URL: ${REDIS_URL:-}
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_PRETTY: ${LOG_PRETTY:-false}
+      SESSION_SECRET: ${SESSION_SECRET:-replace_with_long_random_secret_at_least_32_chars}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-codexchat_session}
+      CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-codexchat_csrf}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
     networks:
       - codexchat_internal
 
