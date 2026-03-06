@@ -885,3 +885,24 @@ EOF
   - `wss://todo.flounderboard.com/ws` ✅ reachable/auth-enforced (websocket handshake rejected with HTTP 403 when unauthenticated)
 - Notes/blockers:
   - None.
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/frontendTODO.md :: 8) Conversation Search (MVP+ UI)
+- Questions asked:
+  1) Should sidebar search call backend on each keystroke with a 300ms debounce, or only on Enter?
+  2) When the query is empty, should we immediately restore the normal conversation list ordering from GET /api/conversations?
+  3) For preserving selection on clear/reset, should the currently open conversation stay selected even if it isn’t in the filtered results?
+- Assumptions:
+  - Search requests are sent on each keystroke with a 300ms debounce window.
+  - Empty query immediately resets the sidebar to the latest `/api/conversations` ordering.
+  - Selected conversation in the main pane remains source-of-truth across search clear/reset transitions.
+- Validation commands/results:
+  - `cd codexchat_front && timeout 600s npm run lint` ✅
+  - `cd codexchat_front && timeout 240s npx tsc --noEmit` ✅
+  - `cd codexchat_front && timeout 420s npm run build` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - `timeout 180s npx eslint components/chat/chat-workspace.tsx` hit timeout; full lint then passed with larger timeout.

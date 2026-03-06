@@ -71,10 +71,10 @@
 - [x] Enforce frontend file size validation (default 15 MB from settings). (completed 2026-03-06)
 
 ## 8) Conversation Search (MVP+ UI)
-- [ ] Add search input in sidebar.
-- [ ] Wire search input to conversation search endpoint.
-- [ ] Show filtered results with loading/empty states.
-- [ ] Preserve selected conversation state during search clear/reset.
+- [x] Add search input in sidebar. (completed 2026-03-06)
+- [x] Wire search input to conversation search endpoint. (completed 2026-03-06)
+- [x] Show filtered results with loading/empty states. (completed 2026-03-06)
+- [x] Preserve selected conversation state during search clear/reset. (completed 2026-03-06)
 
 ## 9) Settings Page
 - [ ] Build settings sections: `Appearance`, `Execution`, `Uploads`, `Heartbeats`, `Safety`.

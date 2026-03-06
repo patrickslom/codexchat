@@ -384,6 +384,11 @@ export default function ChatWorkspace() {
   const [isRefreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [conversationSearchQuery, setConversationSearchQuery] = useState("");
+  const [debouncedConversationSearchQuery, setDebouncedConversationSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ConversationItem[]>([]);
+  const [isSearchLoading, setSearchLoading] = useState(false);
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
     selectedFromQuery,
   );
@@ -414,6 +419,9 @@ export default function ChatWorkspace() {
 
   const selectedConversation =
     conversations.find((item) => item.id === selectedConversationId) ?? null;
+  const normalizedSearchQuery = debouncedConversationSearchQuery.trim();
+  const isSearchActive = normalizedSearchQuery.length > 0;
+  const visibleConversations = isSearchActive ? searchResults : conversations;
 
   const selectedTimelineMessages = useMemo(() => {
     if (!selectedConversationId) {
@@ -519,6 +527,69 @@ export default function ChatWorkspace() {
   useEffect(() => {
     void loadConversations("initial");
   }, [loadConversations]);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      setDebouncedConversationSearchQuery(conversationSearchQuery);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [conversationSearchQuery]);
+
+  const searchRequestIdRef = useRef(0);
+
+  const searchConversations = useCallback(async (query: string) => {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
+      setSearchResults([]);
+      setSearchErrorMessage(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    const requestId = searchRequestIdRef.current + 1;
+    searchRequestIdRef.current = requestId;
+    setSearchLoading(true);
+    setSearchErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/conversations/search?q=${encodeURIComponent(normalizedQuery)}`,
+        {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Request failed with ${response.status}`);
+      }
+
+      const payload = (await response.json()) as unknown;
+      const normalized = extractConversations(payload)
+        .map(normalizeConversation)
+        .filter((item): item is ConversationItem => Boolean(item));
+
+      if (searchRequestIdRef.current === requestId) {
+        setSearchResults(normalized);
+      }
+    } catch {
+      if (searchRequestIdRef.current === requestId) {
+        setSearchErrorMessage("Unable to search conversations right now.");
+      }
+    } finally {
+      if (searchRequestIdRef.current === requestId) {
+        setSearchLoading(false);
+      }
+    }
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    void searchConversations(debouncedConversationSearchQuery);
+  }, [debouncedConversationSearchQuery, searchConversations]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1148,7 +1219,11 @@ export default function ChatWorkspace() {
     <div className="min-h-screen min-h-dvh bg-background text-foreground md:grid md:grid-cols-[320px_1fr]">
       <aside className="hidden border-r border-border bg-muted/40 md:flex md:min-h-screen md:min-h-dvh md:flex-col">
         <SidebarContent
-          conversations={conversations}
+          conversations={visibleConversations}
+          searchQuery={conversationSearchQuery}
+          isSearchActive={isSearchActive}
+          isSearchLoading={isSearchLoading}
+          searchErrorMessage={searchErrorMessage}
           selectedConversationId={selectedConversationId}
           busyByConversationId={busyByConversationId}
           isLoading={isLoading}
@@ -1158,6 +1233,8 @@ export default function ChatWorkspace() {
           onConversationListScroll={onConversationListScroll}
           onSelectConversation={onSelectConversation}
           onNewChat={onNewChat}
+          onSearchChange={setConversationSearchQuery}
+          onRetrySearch={() => void searchConversations(debouncedConversationSearchQuery)}
           onRetry={() => void loadConversations("refresh")}
         />
       </aside>
@@ -1186,7 +1263,11 @@ export default function ChatWorkspace() {
             />
             <aside className="relative z-10 h-full w-screen border-r border-border bg-background">
               <SidebarContent
-                conversations={conversations}
+                conversations={visibleConversations}
+                searchQuery={conversationSearchQuery}
+                isSearchActive={isSearchActive}
+                isSearchLoading={isSearchLoading}
+                searchErrorMessage={searchErrorMessage}
                 selectedConversationId={selectedConversationId}
                 busyByConversationId={busyByConversationId}
                 isLoading={isLoading}
@@ -1196,6 +1277,8 @@ export default function ChatWorkspace() {
                 onConversationListScroll={onConversationListScroll}
                 onSelectConversation={onSelectConversation}
                 onNewChat={onNewChat}
+                onSearchChange={setConversationSearchQuery}
+                onRetrySearch={() => void searchConversations(debouncedConversationSearchQuery)}
                 onRetry={() => void loadConversations("refresh")}
                 mobile
                 onClose={() => setDrawerOpen(false)}
@@ -1279,6 +1362,10 @@ export default function ChatWorkspace() {
 
 type SidebarContentProps = {
   conversations: ConversationItem[];
+  searchQuery: string;
+  isSearchActive: boolean;
+  isSearchLoading: boolean;
+  searchErrorMessage: string | null;
   selectedConversationId: string | null;
   busyByConversationId: Record<string, boolean>;
   isLoading: boolean;
@@ -1288,6 +1375,8 @@ type SidebarContentProps = {
   onConversationListScroll: () => void;
   onSelectConversation: (conversationId: string) => void;
   onNewChat: () => void;
+  onSearchChange: (value: string) => void;
+  onRetrySearch: () => void;
   onRetry: () => void;
   mobile?: boolean;
   onClose?: () => void;
@@ -1295,6 +1384,10 @@ type SidebarContentProps = {
 
 function SidebarContent({
   conversations,
+  searchQuery,
+  isSearchActive,
+  isSearchLoading,
+  searchErrorMessage,
   selectedConversationId,
   busyByConversationId,
   isLoading,
@@ -1304,6 +1397,8 @@ function SidebarContent({
   onConversationListScroll,
   onSelectConversation,
   onNewChat,
+  onSearchChange,
+  onRetrySearch,
   onRetry,
   mobile = false,
   onClose,
@@ -1337,18 +1432,34 @@ function SidebarContent({
         + New chat
       </button>
 
-      <p className="mt-6 text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Recent</p>
+      <div className="mt-4">
+        <label htmlFor="conversation-search" className="sr-only">
+          Search conversations
+        </label>
+        <input
+          id="conversation-search"
+          type="search"
+          value={searchQuery}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Search conversations"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-foreground focus:ring-2 focus:ring-foreground/15"
+        />
+      </div>
+
+      <p className="mt-6 text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">
+        {isSearchActive ? "Search results" : "Recent"}
+      </p>
 
       <div
         ref={listRef}
         onScroll={onConversationListScroll}
         className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
       >
-        {isLoading ? (
+        {!isSearchActive && isLoading ? (
           <ConversationListLoading />
         ) : null}
 
-        {!isLoading && errorMessage ? (
+        {!isSearchActive && !isLoading && errorMessage ? (
           <div className="rounded-xl border border-border bg-background p-3 text-sm">
             <p className="text-muted-foreground">{errorMessage}</p>
             <button
@@ -1361,13 +1472,40 @@ function SidebarContent({
           </div>
         ) : null}
 
-        {!isLoading && !errorMessage && conversations.length === 0 ? (
+        {isSearchActive && isSearchLoading ? (
+          <div className="rounded-xl border border-border bg-background p-3 text-sm text-muted-foreground">
+            Searching conversations…
+          </div>
+        ) : null}
+
+        {isSearchActive && !isSearchLoading && searchErrorMessage ? (
+          <div className="rounded-xl border border-border bg-background p-3 text-sm">
+            <p className="text-muted-foreground">{searchErrorMessage}</p>
+            <button
+              type="button"
+              className="mt-3 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
+              onClick={onRetrySearch}
+            >
+              Retry search
+            </button>
+          </div>
+        ) : null}
+
+        {!isSearchActive && !isLoading && !errorMessage && conversations.length === 0 ? (
           <div className="rounded-xl border border-border bg-background p-3 text-sm text-muted-foreground">
             No conversations yet - start a new chat
           </div>
         ) : null}
 
-        {!isLoading && !errorMessage && conversations.length > 0
+        {isSearchActive && !isSearchLoading && !searchErrorMessage && conversations.length === 0 ? (
+          <div className="rounded-xl border border-border bg-background p-3 text-sm text-muted-foreground">
+            No matches found.
+          </div>
+        ) : null}
+
+        {((!isSearchActive && !isLoading && !errorMessage) ||
+          (isSearchActive && !isSearchLoading && !searchErrorMessage)) &&
+        conversations.length > 0
           ? conversations.map((conversation) => {
               const isSelected = selectedConversationId === conversation.id;
               const isBusy = Boolean(busyByConversationId[conversation.id]);
