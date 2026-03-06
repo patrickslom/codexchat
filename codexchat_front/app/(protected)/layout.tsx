@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { hasSessionCookie } from "@/lib/auth-session";
+import SafetyGuardrailBanner from "@/components/ui/safety-guardrail-banner";
 
 export default async function ProtectedLayout({
   children,
@@ -10,5 +11,10 @@ export default async function ProtectedLayout({
     redirect("/login");
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <SafetyGuardrailBanner />
+      {children}
+    </>
+  );
 }

@@ -104,10 +104,10 @@
 - [x] Add run history view (status + timestamps + errors). (completed 2026-03-06)
 
 ## 12) Safety + UX Guardrails
-- [ ] Show global warning banner about destructive VPS actions.
-- [ ] Show explicit warning when YOLO mode is enabled.
-- [ ] Show notice that shared VPS mode is not private.
-- [ ] Add confirmation dialog before high-risk actions.
+- [x] Show global warning banner about destructive VPS actions. (completed 2026-03-06)
+- [x] Show explicit warning when YOLO mode is enabled. (completed 2026-03-06)
+- [x] Show notice that shared VPS mode is not private. (completed 2026-03-06)
+- [x] Add confirmation dialog before high-risk actions. (completed 2026-03-06)
 
 ## 13) Polish + Manual QA Pass
 - [ ] Verify mobile layout on narrow screens and modern phones.

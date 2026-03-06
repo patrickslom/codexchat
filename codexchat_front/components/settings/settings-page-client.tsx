@@ -433,6 +433,16 @@ export default function SettingsPageClient({ isAdmin }: SettingsPageClientProps)
                   );
                 })}
               </div>
+              {draft.execution_mode_default === "yolo" ? (
+                <article
+                  className={`mt-4 rounded-lg border px-4 py-3 text-sm ${warningCardClasses(
+                    draft.yolo_mode_warning.severity,
+                  )}`}
+                >
+                  <p className="font-semibold">{draft.yolo_mode_warning.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed opacity-90">{draft.yolo_mode_warning.content}</p>
+                </article>
+              ) : null}
             </section>
 
             <section className="rounded-xl border border-border bg-background p-5 sm:p-6">

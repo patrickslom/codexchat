@@ -73,6 +73,11 @@ type RunsModalState = {
   runs: HeartbeatRun[];
 };
 
+type DeleteJobModalState = {
+  job: HeartbeatJob;
+  jobName: string;
+};
+
 const INTERVAL_PRESETS = [5, 10, 15, 30, 60] as const;
 
 function parseErrorMessage(raw: unknown, fallback: string): string {
@@ -226,6 +231,7 @@ export default function HeartbeatJobsPageClient() {
   const [isSavingEdit, setSavingEdit] = useState(false);
   const [isDeletingId, setDeletingId] = useState<string | null>(null);
   const [runsModal, setRunsModal] = useState<RunsModalState | null>(null);
+  const [deleteJobModal, setDeleteJobModal] = useState<DeleteJobModalState | null>(null);
 
   const pushToast = useCallback((tone: ToastTone, title: string, description?: string) => {
     const id = makeToastId("toast");
@@ -431,11 +437,6 @@ export default function HeartbeatJobsPageClient() {
         return;
       }
 
-      const confirmed = window.confirm(`Delete heartbeat job \"${jobNameFromPath(job.instruction_file_path, job.id)}\"?`);
-      if (!confirmed) {
-        return;
-      }
-
       setDeletingId(job.id);
       try {
         const response = await fetch(`${apiBaseUrl}/heartbeat-jobs/${encodeURIComponent(job.id)}`, {
@@ -465,6 +466,15 @@ export default function HeartbeatJobsPageClient() {
     },
     [apiBaseUrl, isDeletingId, pushToast, router],
   );
+
+  const onConfirmDeleteJob = useCallback(async () => {
+    if (!deleteJobModal) {
+      return;
+    }
+
+    await onDeleteJob(deleteJobModal.job);
+    setDeleteJobModal(null);
+  }, [deleteJobModal, onDeleteJob]);
 
   return (
     <>
@@ -695,7 +705,12 @@ export default function HeartbeatJobsPageClient() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => void onDeleteJob(job)}
+                              onClick={() =>
+                                setDeleteJobModal({
+                                  job,
+                                  jobName: jobNameFromPath(job.instruction_file_path, job.id),
+                                })
+                              }
                               disabled={isDeleting}
                               className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 transition hover:border-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-800 dark:text-red-300"
                             >
@@ -862,6 +877,33 @@ export default function HeartbeatJobsPageClient() {
                 onClick={() => setRunsModal(null)}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteJobModal ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-5 shadow-lg">
+            <h2 className="text-lg font-semibold tracking-tight">Delete heartbeat job?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This will archive <span className="font-medium text-foreground">{deleteJobModal.jobName}</span> and stop future runs.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-border px-3 py-2 text-sm"
+                onClick={() => setDeleteJobModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background"
+                onClick={() => void onConfirmDeleteJob()}
+              >
+                Confirm delete
               </button>
             </div>
           </div>

@@ -37,6 +37,11 @@ type ResetModalState = {
   forcePasswordReset: boolean;
 };
 
+type StatusToggleModalState = {
+  user: AdminUser;
+  nextIsActive: boolean;
+};
+
 function parseErrorMessage(raw: unknown, fallback: string): string {
   if (!raw || typeof raw !== "object") {
     return fallback;
@@ -108,6 +113,7 @@ export default function AdminSettingsPageClient() {
   const [isCreating, setCreating] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
   const [resetModal, setResetModal] = useState<ResetModalState | null>(null);
+  const [statusToggleModal, setStatusToggleModal] = useState<StatusToggleModalState | null>(null);
 
   const pushToast = useCallback((tone: ToastTone, title: string, description?: string) => {
     const id = makeToastId("toast");
@@ -336,6 +342,24 @@ export default function AdminSettingsPageClient() {
     }
   }, [apiBaseUrl, loadUsers, patchUser, pushToast, resetModal, router]);
 
+  const onConfirmStatusToggle = useCallback(async () => {
+    if (!statusToggleModal) {
+      return;
+    }
+
+    const { user, nextIsActive } = statusToggleModal;
+    const didPatch = await patchUser(
+      user.id,
+      { is_active: nextIsActive },
+      nextIsActive ? "User enabled" : "User disabled",
+      `${user.email} is now ${nextIsActive ? "enabled" : "disabled"}.`,
+    );
+
+    if (didPatch) {
+      setStatusToggleModal(null);
+    }
+  }, [patchUser, statusToggleModal]);
+
   return (
     <>
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
@@ -472,12 +496,10 @@ export default function AdminSettingsPageClient() {
                               type="button"
                               disabled={isActioning}
                               onClick={() =>
-                                void patchUser(
-                                  user.id,
-                                  { is_active: !user.is_active },
-                                  user.is_active ? "User disabled" : "User enabled",
-                                  `${user.email} is now ${user.is_active ? "disabled" : "enabled"}.`,
-                                )
+                                setStatusToggleModal({
+                                  user,
+                                  nextIsActive: !user.is_active,
+                                })
                               }
                               className="rounded-md border border-border px-2 py-1 text-xs font-medium transition hover:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -579,6 +601,37 @@ export default function AdminSettingsPageClient() {
                 onClick={() => void onResetPasswordSubmit()}
               >
                 Apply reset
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {statusToggleModal ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-5 shadow-lg">
+            <h2 className="text-lg font-semibold tracking-tight">
+              {statusToggleModal.nextIsActive ? "Enable user account?" : "Disable user account?"}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {statusToggleModal.nextIsActive
+                ? `${statusToggleModal.user.email} will regain access immediately.`
+                : `${statusToggleModal.user.email} will be blocked from signing in until re-enabled.`}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-border px-3 py-2 text-sm"
+                onClick={() => setStatusToggleModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background"
+                onClick={() => void onConfirmStatusToggle()}
+              >
+                Confirm
               </button>
             </div>
           </div>

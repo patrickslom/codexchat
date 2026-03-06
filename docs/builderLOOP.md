@@ -978,3 +978,22 @@ EOF
   - `wss://todo.flounderboard.com/ws` ✅ reachable/auth-enforced (python websocket handshake returned HTTP 403 unauthenticated)
 - Notes/blockers:
   - None.
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/frontendTODO.md :: 12) Safety + UX Guardrails
+- Questions asked:
+  1) Should the global warning banner appear on all authenticated pages (`/chat`, `/settings`, `/settings/admin`) or chat-only?
+  2) Which actions should count as high-risk for the confirmation dialog in this section?
+  3) For the YOLO warning, do you want a persistent inline warning, a one-time modal on enable, or both?
+- Assumptions:
+  - Global warnings are shown across all authenticated pages using the shared protected layout.
+  - High-risk confirmations include enabling/disabling users and deleting heartbeat jobs; YOLO enable keeps explicit modal confirmation.
+  - YOLO warning should be both one-time confirm modal at selection and persistent warning when active.
+- Validation commands/results:
+  - `cd codexchat_front && npm run lint` ✅
+  - `cd codexchat_front && npm run build` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
