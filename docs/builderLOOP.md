@@ -258,6 +258,31 @@ EOF
 - Questions asked:
   1) Start with frontend bootstrap first despite default DB/backend priority?
   2) Scaffold `codexchat_front/` with Next.js App Router + Tailwind?
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/backendTODO.md :: 11) Search and Query Performance (MVP+) + 12) Safety and Warning Surfaces
+- Questions asked:
+  1) For `GET /api/conversations/search`, should default scope exclude archived content unless `include_archived=true`?
+  2) Should pagination be `page` + `page_size` with total count?
+  3) Should warnings be returned as a shared catalog in both `GET /api/settings` and chat endpoints?
+- Assumptions:
+  - Search defaults to active-only rows (`include_archived=false`) unless explicitly requested.
+  - Pagination is `page` + `page_size` with total and `has_next_page`.
+  - Warning metadata should be consistent across settings and chat APIs.
+- Validation commands/results:
+  - `python3 -m compileall codexchat_back/app codexchat_back/alembic` ✅
+- Commit: `e7b2a84` - feat(backend): add conversation search ranking and shared warning payload surfaces
+- Push: `origin/master` updated successfully
+- Deploy status:
+  - Lock coordination via `LOCK.md` ✅ (acquired as `BACK`, reset to unlocked template)
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
+- Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200 after brief startup 502)
+  - `wss://todo.flounderboard.com/ws` ✅ reachable/auth-enforced (HTTP 403 without session cookie)
+- Notes/blockers:
+  - Initial API/ws probes returned transient `502` during startup; subsequent retries passed.
   3) Also handle HTTPS certificate in same run or frontend-only?
 - Assumptions:
   - User approved frontend-first execution order for this run.
