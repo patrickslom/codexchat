@@ -48,14 +48,14 @@
 - [x] Add error mapping from Codex/runtime failures to websocket error events. (completed 2026-03-06)
 
 ## 6) Codex Bridge (API Service)
-- [ ] Build Codex process runner using `codex app-server --listen stdio://`.
-- [ ] Implement spawn-per-turn lifecycle:
-- [ ] spawn process on send.
-- [ ] stream output deltas.
-- [ ] persist final output.
-- [ ] terminate process after completion/error/timeout.
-- [ ] Persist and reuse `codex_thread_id` per conversation.
-- [ ] Add process timeout and cleanup guardrails.
+- [x] Build Codex process runner using `codex app-server --listen stdio://`. (completed 2026-03-06)
+- [x] Implement spawn-per-turn lifecycle: (completed 2026-03-06)
+- [x] spawn process on send. (completed 2026-03-06)
+- [x] stream output deltas. (completed 2026-03-06)
+- [x] persist final output. (completed 2026-03-06)
+- [x] terminate process after completion/error/timeout. (completed 2026-03-06)
+- [x] Persist and reuse `codex_thread_id` per conversation. (completed 2026-03-06)
+- [x] Add process timeout and cleanup guardrails. (completed 2026-03-06)
 
 ## 7) Thread Locking and Concurrency
 - [ ] Implement per-conversation lock acquisition before turn execution.

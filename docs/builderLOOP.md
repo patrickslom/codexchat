@@ -726,3 +726,20 @@ EOF
 - Deploy status:
 - Smoke check status:
 - Notes/blockers:
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/backendTODO.md :: 6) Codex Bridge (API Service)
+- Questions asked:
+  1) Should the Codex runner use the current authenticated user identity in command context, or always run as the service user?
+  2) For turn timeout, do you want a fixed default (for example 300s) or a configurable env-based timeout?
+  3) On timeout/error, should partial streamed assistant text be persisted as an assistant message, or discarded unless completion succeeds?
+- Assumptions:
+  - Codex processes run under the backend service account only; app user identity is logged/persisted as metadata.
+  - Turn timeout is env-configurable via `CODEX_TURN_TIMEOUT_SECONDS` with default `300`.
+  - Partial assistant output is persisted on timeout/error when content is meaningful, with metadata status markers.
+- Validation commands/results:
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:

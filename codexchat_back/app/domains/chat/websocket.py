@@ -4,9 +4,9 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -16,6 +16,12 @@ from sqlalchemy import select
 from app.db.archive_queries import get_conversation
 from app.db.models import Message, User
 from app.db.session import SessionLocal
+from app.domains.codex.runtime import (
+    RuntimeExecutionError,
+    RuntimeTimeoutError,
+    RuntimeUnavailableError,
+    codex_process_runner,
+)
 
 logger = logging.getLogger("app.api")
 
@@ -46,36 +52,6 @@ class ClientEventError(Exception):
         self.details = details
 
 
-class RuntimeUnavailableError(Exception):
-    pass
-
-
-class RuntimeExecutionError(Exception):
-    pass
-
-
-def _chunk_text(content: str, *, chunk_size: int = 24) -> list[str]:
-    return [content[index : index + chunk_size] for index in range(0, len(content), chunk_size)] or [""]
-
-
-class MockCodexRuntime:
-    """MVP placeholder runtime until Codex bridge integration is implemented."""
-
-    async def stream_assistant_reply(self, *, prompt: str) -> AsyncIterator[str]:
-        normalized = prompt.strip()
-        lowered = normalized.lower()
-
-        if lowered.startswith("/runtime-unavailable"):
-            raise RuntimeUnavailableError("Codex runtime is currently unavailable")
-        if lowered.startswith("/runtime-error"):
-            raise RuntimeExecutionError("Codex runtime failed while processing the turn")
-
-        response = f"MVP stream placeholder response:\n{normalized}"
-        for chunk in _chunk_text(response):
-            await asyncio.sleep(0.04)
-            yield chunk
-
-
 @dataclass(slots=True)
 class ActiveTurn:
     task: asyncio.Task[None]
@@ -84,12 +60,10 @@ class ActiveTurn:
 
 class ChatWebSocketService:
     def __init__(self) -> None:
-        self._runtime = MockCodexRuntime()
         self._state_lock = asyncio.Lock()
         self._subscriptions: dict[UUID, set[WebSocket]] = defaultdict(set)
         self._socket_subscriptions: dict[WebSocket, set[UUID]] = defaultdict(set)
         self._active_turns: dict[UUID, ActiveTurn] = {}
-        self._turn_timeout_seconds = 45
 
     async def handle_connection(self, websocket: WebSocket, *, user: User) -> None:
         request_id = websocket.headers.get("x-request-id") or str(uuid4())
@@ -122,7 +96,7 @@ class ChatWebSocketService:
                     await self._handle_resume(websocket, event=event)
                     continue
 
-                await self._handle_send_message(websocket, user=user, event=event)
+                await self._handle_send_message(websocket, user=user, request_id=request_id, event=event)
         except WebSocketDisconnect:
             logger.info(
                 "websocket_disconnected",
@@ -165,6 +139,8 @@ class ChatWebSocketService:
                     "conversation_id": str(conversation_id),
                     "message_id": str(latest_assistant_message.id),
                     "content": latest_assistant_message.content,
+                    "status": latest_assistant_message.metadata_json.get("turn_status", "completed"),
+                    "partial": bool(latest_assistant_message.metadata_json.get("partial", False)),
                 },
             )
 
@@ -173,6 +149,7 @@ class ChatWebSocketService:
         websocket: WebSocket,
         *,
         user: User,
+        request_id: str,
         event: SendMessageEvent,
     ) -> None:
         conversation_id = event.conversation_id
@@ -208,6 +185,7 @@ class ChatWebSocketService:
                     self._run_turn(
                         conversation_id=conversation_id,
                         user_id=user.id,
+                        request_id=request_id,
                         content=content,
                     )
                 )
@@ -222,58 +200,78 @@ class ChatWebSocketService:
             )
             return
 
-    async def _run_turn(self, *, conversation_id: UUID, user_id: UUID, content: str) -> None:
+    async def _run_turn(self, *, conversation_id: UUID, user_id: UUID, request_id: str, content: str) -> None:
         assistant_content = ""
+        thread_id: str | None = None
+        turn_id: str | None = None
         try:
             with SessionLocal() as db:
+                conversation = get_conversation(db, conversation_id, include_archived=False)
+                if conversation is None:
+                    await self._broadcast_error(
+                        conversation_id,
+                        code="NOT_FOUND",
+                        message="Conversation not found",
+                    )
+                    return
+
+                thread_id = conversation.codex_thread_id
                 db.add(
                     Message(
                         conversation_id=conversation_id,
                         role="user",
                         content=content,
+                        metadata_json={
+                            "source": "websocket",
+                            "request_id": request_id,
+                            "user_id": str(user_id),
+                        },
                     )
                 )
                 db.commit()
 
-            try:
-                async with asyncio.timeout(self._turn_timeout_seconds):
-                    async for delta in self._runtime.stream_assistant_reply(prompt=content):
-                        assistant_content += delta
-                        await self._broadcast_to_conversation(
-                            conversation_id,
-                            {
-                                "type": "assistant_delta",
-                                "conversation_id": str(conversation_id),
-                                "delta": delta,
-                            },
-                        )
-            except TimeoutError:
-                await self._broadcast_error(
-                    conversation_id,
-                    code="CODEX_TIMEOUT",
-                    message="Codex runtime timed out",
-                )
-                return
-            except RuntimeUnavailableError as exc:
-                await self._broadcast_error(
-                    conversation_id,
-                    code="CODEX_UNAVAILABLE",
-                    message=str(exc),
-                )
-                return
-            except RuntimeExecutionError as exc:
-                await self._broadcast_error(
-                    conversation_id,
-                    code="CODEX_RUNTIME_ERROR",
-                    message=str(exc),
-                )
-                return
+            turn_result = await codex_process_runner.run_turn(
+                prompt=content,
+                existing_thread_id=thread_id,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                request_id=request_id,
+                on_delta=lambda delta: asyncio.create_task(
+                    self._broadcast_to_conversation(
+                        conversation_id,
+                        {
+                            "type": "assistant_delta",
+                            "conversation_id": str(conversation_id),
+                            "delta": delta,
+                        },
+                    )
+                ),
+            )
+            assistant_content = turn_result.content
+            thread_id = turn_result.thread_id
+            turn_id = turn_result.turn_id
 
             with SessionLocal() as db:
+                conversation = get_conversation(db, conversation_id, include_archived=False)
+                if conversation is None:
+                    return
+
+                if conversation.codex_thread_id != thread_id:
+                    conversation.codex_thread_id = thread_id
+
                 assistant_message = Message(
                     conversation_id=conversation_id,
                     role="assistant",
                     content=assistant_content,
+                    metadata_json={
+                        "partial": False,
+                        "turn_status": "completed",
+                        "request_id": request_id,
+                        "user_id": str(user_id),
+                        "thread_id": thread_id,
+                        "turn_id": turn_id,
+                        "runtime": "codex_app_server_stdio",
+                    },
                 )
                 db.add(assistant_message)
                 db.commit()
@@ -286,12 +284,79 @@ class ChatWebSocketService:
                     "conversation_id": str(conversation_id),
                     "message_id": str(assistant_message.id),
                     "content": assistant_content,
+                    "status": "completed",
+                    "partial": False,
                 },
             )
+        except RuntimeTimeoutError:
+            await self._persist_partial_if_meaningful(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                request_id=request_id,
+                content=assistant_content,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                status="timed_out",
+                error_code="CODEX_TIMEOUT",
+                error_message="Codex runtime timed out",
+            )
+            await self._broadcast_error(
+                conversation_id,
+                code="CODEX_TIMEOUT",
+                message="Codex runtime timed out",
+            )
+            return
+        except RuntimeUnavailableError as exc:
+            await self._persist_partial_if_meaningful(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                request_id=request_id,
+                content=assistant_content,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                status="failed",
+                error_code="CODEX_UNAVAILABLE",
+                error_message=str(exc),
+            )
+            await self._broadcast_error(
+                conversation_id,
+                code="CODEX_UNAVAILABLE",
+                message=str(exc),
+            )
+            return
+        except RuntimeExecutionError as exc:
+            await self._persist_partial_if_meaningful(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                request_id=request_id,
+                content=assistant_content,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                status="failed",
+                error_code="CODEX_RUNTIME_ERROR",
+                error_message=str(exc),
+            )
+            await self._broadcast_error(
+                conversation_id,
+                code="CODEX_RUNTIME_ERROR",
+                message=str(exc),
+            )
+            return
         except Exception:
             logger.exception(
                 "websocket_turn_runtime_failure",
                 extra={"event_data": {"conversation_id": str(conversation_id), "user_id": str(user_id)}},
+            )
+            await self._persist_partial_if_meaningful(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                request_id=request_id,
+                content=assistant_content,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                status="failed",
+                error_code="CODEX_RUNTIME_ERROR",
+                error_message="Codex runtime failed while processing the turn",
             )
             await self._broadcast_error(
                 conversation_id,
@@ -301,6 +366,63 @@ class ChatWebSocketService:
         finally:
             async with self._state_lock:
                 self._active_turns.pop(conversation_id, None)
+
+    async def _persist_partial_if_meaningful(
+        self,
+        *,
+        conversation_id: UUID,
+        user_id: UUID,
+        request_id: str,
+        content: str,
+        thread_id: str | None,
+        turn_id: str | None,
+        status: str,
+        error_code: str,
+        error_message: str,
+    ) -> None:
+        if not _is_meaningful_content(content):
+            return
+
+        with SessionLocal() as db:
+            conversation = get_conversation(db, conversation_id, include_archived=False)
+            if conversation is None:
+                return
+
+            if thread_id and conversation.codex_thread_id != thread_id:
+                conversation.codex_thread_id = thread_id
+
+            assistant_message = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=content,
+                metadata_json={
+                    "partial": True,
+                    "turn_status": status,
+                    "request_id": request_id,
+                    "user_id": str(user_id),
+                    "thread_id": thread_id,
+                    "turn_id": turn_id,
+                    "runtime": "codex_app_server_stdio",
+                    "error_code": error_code,
+                    "error_message": error_message,
+                    "saved_at": datetime.now(tz=UTC).isoformat(),
+                },
+            )
+            db.add(assistant_message)
+            db.commit()
+            db.refresh(assistant_message)
+
+        await self._broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "assistant_done",
+                "conversation_id": str(conversation_id),
+                "message_id": str(assistant_message.id),
+                "content": content,
+                "status": status,
+                "partial": True,
+            },
+        )
 
     async def _send_error(
         self,
@@ -361,6 +483,15 @@ class ChatWebSocketService:
                 subscribers.discard(websocket)
                 if not subscribers:
                     self._subscriptions.pop(conversation_id, None)
+
+
+def _is_meaningful_content(content: str) -> bool:
+    normalized = " ".join(content.split())
+    if len(normalized) < 3:
+        return False
+    if all(character in ".,!?;:-_()[]{}'\"`~" for character in normalized):
+        return False
+    return True
 
 
 def _normalize_client_payload(raw_payload: dict[str, object]) -> dict[str, object]:

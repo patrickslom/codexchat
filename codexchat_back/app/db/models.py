@@ -99,6 +99,11 @@ class Message(Base):
     # Soft-delete marker semantics used across archivable tables:
     # NULL => active row, non-NULL TIMESTAMPTZ => archived row.
     archived_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
 
 
 class File(Base):

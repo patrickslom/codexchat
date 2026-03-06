@@ -35,6 +35,7 @@ class MessageResponse(BaseModel):
     id: str
     role: str
     content: str
+    metadata_json: dict[str, object]
     created_at: datetime
     archived_at: datetime | None
     is_archived: bool
@@ -90,6 +91,7 @@ def _message_to_response(message: Message) -> MessageResponse:
         id=str(message.id),
         role=message.role,
         content=message.content,
+        metadata_json=message.metadata_json or {},
         created_at=message.created_at,
         archived_at=message.archived_at,
         is_archived=message.archived_at is not None,
