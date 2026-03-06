@@ -4,7 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import ThemeToggle from "@/app/components/theme-toggle";
-import { getApiBaseUrl } from "@/lib/network-config";
+import { useChatWebSocket } from "@/hooks/use-chat-websocket";
+import { getApiBaseUrl, getWebSocketUrl } from "@/lib/network-config";
+import MessageMarkdown from "@/components/chat/message-markdown";
+import type {
+  AssistantDeltaEvent,
+  AssistantDoneEvent,
+  ChatErrorEvent,
+  ChatMessage,
+  ChatRole,
+  ConversationBusyEvent,
+} from "@/types/chat";
 
 type ApiConversation = {
   id?: string;
@@ -15,11 +25,35 @@ type ApiConversation = {
   createdAt?: string;
 };
 
+type ApiConversationMessage = {
+  id?: string;
+  role?: string;
+  content?: string;
+  created_at?: string;
+  createdAt?: string;
+};
+
 type ConversationItem = {
   id: string;
   title: string;
   updatedAt: string | null;
 };
+
+type ConversationDetail = {
+  messages: ChatMessage[];
+};
+
+type ChatEvent =
+  | AssistantDeltaEvent
+  | AssistantDoneEvent
+  | ChatErrorEvent
+  | ConversationBusyEvent
+  | {
+      type?: string;
+      conversationId?: string;
+      conversation_id?: string;
+      [key: string]: unknown;
+    };
 
 const SHOULD_USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "1";
 
@@ -76,6 +110,58 @@ function normalizeConversation(item: ApiConversation): ConversationItem | null {
   };
 }
 
+function isChatRole(value: string): value is ChatRole {
+  return value === "user" || value === "assistant" || value === "system";
+}
+
+function normalizeMessage(item: ApiConversationMessage): ChatMessage | null {
+  if (!item.id || typeof item.id !== "string") {
+    return null;
+  }
+
+  const role = typeof item.role === "string" ? item.role : "assistant";
+  if (!isChatRole(role)) {
+    return null;
+  }
+
+  return {
+    id: item.id,
+    role,
+    content: typeof item.content === "string" ? item.content : "",
+    createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function extractConversationDetail(payload: unknown): ConversationDetail {
+  if (!payload || typeof payload !== "object") {
+    return { messages: [] };
+  }
+
+  const root = payload as {
+    conversation?: {
+      messages?: unknown;
+    };
+    messages?: unknown;
+    data?: {
+      messages?: unknown;
+    };
+  };
+
+  const rawMessages =
+    root.conversation?.messages ??
+    root.messages ??
+    root.data?.messages ??
+    [];
+
+  const messages = Array.isArray(rawMessages)
+    ? rawMessages.map((item) => normalizeMessage(item as ApiConversationMessage)).filter((item): item is ChatMessage => Boolean(item))
+    : [];
+
+  return {
+    messages,
+  };
+}
+
 function formatUpdatedAt(value: string | null): string {
   if (!value) {
     return "No activity";
@@ -94,6 +180,18 @@ function formatUpdatedAt(value: string | null): string {
   }).format(date);
 }
 
+function formatMessageTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function isLikelyNetworkFailure(error: unknown): boolean {
   if (error instanceof TypeError) {
     return true;
@@ -104,6 +202,45 @@ function isLikelyNetworkFailure(error: unknown): boolean {
   }
 
   return false;
+}
+
+function createClientMessageId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function parseEventPayload(raw: string): ChatEvent | null {
+  try {
+    const payload = JSON.parse(raw) as unknown;
+    if (!payload || typeof payload !== "object") {
+      return null;
+    }
+    return payload as ChatEvent;
+  } catch {
+    return null;
+  }
+}
+
+function extractConversationId(event: ChatEvent): string | null {
+  const direct = event.conversationId ?? event.conversation_id;
+  if (typeof direct === "string" && direct.trim()) {
+    return direct;
+  }
+
+  if ("details" in event && event.details && typeof event.details === "object") {
+    const nested = event.details as { conversationId?: string; conversation_id?: string };
+    if (typeof nested.conversationId === "string" && nested.conversationId.trim()) {
+      return nested.conversationId;
+    }
+    if (typeof nested.conversation_id === "string" && nested.conversation_id.trim()) {
+      return nested.conversation_id;
+    }
+  }
+
+  return null;
 }
 
 export default function ChatWorkspace() {
@@ -121,8 +258,52 @@ export default function ChatWorkspace() {
     selectedFromQuery,
   );
 
+  const [messagesByConversationId, setMessagesByConversationId] = useState<Record<string, ChatMessage[]>>({});
+  const [streamDraftByConversationId, setStreamDraftByConversationId] = useState<Record<string, string>>({});
+  const [busyByConversationId, setBusyByConversationId] = useState<Record<string, boolean>>({});
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
+
   const listRef = useRef<HTMLDivElement | null>(null);
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
+  const wsResolution = useMemo(() => {
+    try {
+      return { url: getWebSocketUrl(), error: null as string | null };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "WebSocket URL is not configured.";
+      return { url: "", error: message };
+    }
+  }, []);
+
+  const selectedConversation =
+    conversations.find((item) => item.id === selectedConversationId) ?? null;
+
+  const selectedTimelineMessages = useMemo(() => {
+    if (!selectedConversationId) {
+      return [];
+    }
+
+    const persisted = messagesByConversationId[selectedConversationId] ?? [];
+    const streaming = streamDraftByConversationId[selectedConversationId];
+    if (!streaming) {
+      return persisted;
+    }
+
+    return [
+      ...persisted,
+      {
+        id: `${selectedConversationId}-streaming`,
+        role: "assistant" as const,
+        content: streaming,
+        createdAt: new Date().toISOString(),
+        pending: true,
+      },
+    ];
+  }, [messagesByConversationId, selectedConversationId, streamDraftByConversationId]);
+
+  const selectedConversationBusy = selectedConversationId
+    ? Boolean(busyByConversationId[selectedConversationId])
+    : false;
 
   const loadConversations = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -165,6 +346,37 @@ export default function ChatWorkspace() {
     [apiBaseUrl],
   );
 
+  const loadConversationMessages = useCallback(
+    async (conversationId: string) => {
+      setTimelineLoading(true);
+      setTimelineError(null);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/conversations/${conversationId}`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with ${response.status}`);
+        }
+
+        const payload = (await response.json()) as unknown;
+        const detail = extractConversationDetail(payload);
+        setMessagesByConversationId((previous) => ({
+          ...previous,
+          [conversationId]: detail.messages,
+        }));
+      } catch {
+        setTimelineError("Unable to load messages for this conversation.");
+      } finally {
+        setTimelineLoading(false);
+      }
+    },
+    [apiBaseUrl],
+  );
+
   useEffect(() => {
     void loadConversations("initial");
   }, [loadConversations]);
@@ -172,6 +384,20 @@ export default function ChatWorkspace() {
   useEffect(() => {
     setSelectedConversationId(selectedFromQuery);
   }, [selectedFromQuery]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      setTimelineError(null);
+      return;
+    }
+
+    if (messagesByConversationId[selectedConversationId]) {
+      setTimelineError(null);
+      return;
+    }
+
+    void loadConversationMessages(selectedConversationId);
+  }, [loadConversationMessages, messagesByConversationId, selectedConversationId]);
 
   useEffect(() => {
     if (!listRef.current) {
@@ -211,8 +437,171 @@ export default function ChatWorkspace() {
     router.push("/chat");
   }, [router]);
 
-  const selectedConversation =
-    conversations.find((item) => item.id === selectedConversationId) ?? null;
+  const applyAssistantDone = useCallback((conversationId: string, content: string | null) => {
+    setBusyByConversationId((previous) => ({
+      ...previous,
+      [conversationId]: false,
+    }));
+
+    setStreamDraftByConversationId((previous) => {
+      const draft = previous[conversationId] ?? "";
+      const finalContent = (content ?? "").trim() ? content : draft;
+      const rest = { ...previous };
+      delete rest[conversationId];
+
+      if (!finalContent || !finalContent.trim()) {
+        return rest;
+      }
+
+      setMessagesByConversationId((messageState) => {
+        const current = messageState[conversationId] ?? [];
+        const lastMessage = current[current.length - 1];
+        if (lastMessage && lastMessage.pending && lastMessage.role === "assistant") {
+          const replaced = [...current];
+          replaced[replaced.length - 1] = {
+            ...lastMessage,
+            content: finalContent,
+            pending: false,
+            createdAt: new Date().toISOString(),
+          };
+
+          return {
+            ...messageState,
+            [conversationId]: replaced,
+          };
+        }
+
+        return {
+          ...messageState,
+          [conversationId]: [
+            ...current,
+            {
+              id: createClientMessageId("assistant"),
+              role: "assistant",
+              content: finalContent,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        };
+      });
+
+      return rest;
+    });
+  }, []);
+
+  const onWebSocketMessage = useCallback(
+    (messageEvent: MessageEvent<string>) => {
+      const event = parseEventPayload(messageEvent.data);
+      if (!event || typeof event.type !== "string") {
+        return;
+      }
+
+      const conversationId = extractConversationId(event) ?? selectedConversationId;
+      if (!conversationId) {
+        return;
+      }
+
+      if (event.type === "assistant_delta") {
+        const deltaEvent = event as AssistantDeltaEvent;
+        const delta = typeof deltaEvent.delta === "string"
+          ? deltaEvent.delta
+          : typeof deltaEvent.content === "string"
+            ? deltaEvent.content
+            : "";
+
+        if (!delta) {
+          return;
+        }
+
+        setBusyByConversationId((previous) => ({
+          ...previous,
+          [conversationId]: true,
+        }));
+
+        setStreamDraftByConversationId((previous) => ({
+          ...previous,
+          [conversationId]: `${previous[conversationId] ?? ""}${delta}`,
+        }));
+        return;
+      }
+
+      if (event.type === "assistant_done") {
+        const doneEvent = event as AssistantDoneEvent;
+        const doneContent =
+          typeof doneEvent.content === "string"
+            ? doneEvent.content
+            : typeof doneEvent.message === "string"
+              ? doneEvent.message
+              : typeof doneEvent.text === "string"
+                ? doneEvent.text
+                : null;
+
+        applyAssistantDone(conversationId, doneContent);
+        return;
+      }
+
+      if (event.type === "conversation_busy" || event.type === "thread_busy") {
+        const busyEvent = event as ConversationBusyEvent;
+        setBusyByConversationId((previous) => ({
+          ...previous,
+          [conversationId]: busyEvent.busy ?? true,
+        }));
+        return;
+      }
+
+      if (event.type === "error") {
+        const errorEvent = event as ChatErrorEvent;
+        const code = (errorEvent.code ?? "").toUpperCase();
+        const isBusyError = code === "THREAD_BUSY" || code === "CONVERSATION_BUSY";
+
+        if (isBusyError) {
+          setBusyByConversationId((previous) => ({
+            ...previous,
+            [conversationId]: true,
+          }));
+          return;
+        }
+
+        if (errorEvent.details?.busy === false) {
+          setBusyByConversationId((previous) => ({
+            ...previous,
+            [conversationId]: false,
+          }));
+        }
+      }
+    },
+    [applyAssistantDone, selectedConversationId],
+  );
+
+  const {
+    connectionState,
+    reconnectAttempts,
+    sendJsonMessage,
+    retryNow,
+  } = useChatWebSocket({
+    url: wsResolution.url,
+    enabled: wsResolution.error === null,
+    onMessage: onWebSocketMessage,
+    onOpen: () => {
+      if (selectedConversationId) {
+        sendJsonMessage({
+          type: "resume",
+          conversationId: selectedConversationId,
+        });
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!selectedConversationId || connectionState !== "connected") {
+      return;
+    }
+
+    sendJsonMessage({
+      type: "resume",
+      conversationId: selectedConversationId,
+    });
+  }, [connectionState, selectedConversationId, sendJsonMessage]);
 
   return (
     <div className="min-h-screen min-h-dvh bg-background text-foreground md:grid md:grid-cols-[320px_1fr]">
@@ -220,6 +609,7 @@ export default function ChatWorkspace() {
         <SidebarContent
           conversations={conversations}
           selectedConversationId={selectedConversationId}
+          busyByConversationId={busyByConversationId}
           isLoading={isLoading}
           isRefreshing={isRefreshing}
           errorMessage={errorMessage}
@@ -257,6 +647,7 @@ export default function ChatWorkspace() {
               <SidebarContent
                 conversations={conversations}
                 selectedConversationId={selectedConversationId}
+                busyByConversationId={busyByConversationId}
                 isLoading={isLoading}
                 isRefreshing={isRefreshing}
                 errorMessage={errorMessage}
@@ -274,17 +665,41 @@ export default function ChatWorkspace() {
 
         <main className="mx-auto flex min-h-[calc(100vh-56px)] min-h-[calc(100dvh-56px)] w-full max-w-5xl flex-col px-4 py-6 sm:px-6 md:min-h-screen md:min-h-dvh md:py-8">
           <section className="rounded-2xl border border-border bg-muted/30 p-5 sm:p-6">
-            <p className="text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground">
-              Conversation
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground">
+                Conversation
+              </p>
+              <ConnectionBadge
+                state={connectionState}
+                reconnectAttempts={reconnectAttempts}
+                hasConfigError={Boolean(wsResolution.error)}
+                onRetry={retryNow}
+              />
+            </div>
+
             {selectedConversation ? (
               <>
-                <h1 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">
-                  {selectedConversation.title}
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Resumed from sidebar selection. Message timeline and streaming will render here.
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                    {selectedConversation.title}
+                  </h1>
+                  {selectedConversationBusy ? (
+                    <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      Busy
+                    </span>
+                  ) : null}
+                </div>
+
+                {wsResolution.error ? (
+                  <p className="mt-2 text-sm text-muted-foreground">{wsResolution.error}</p>
+                ) : null}
+
+                <MessageTimeline
+                  isLoading={timelineLoading}
+                  errorMessage={timelineError}
+                  messages={selectedTimelineMessages}
+                  onRetry={() => selectedConversationId ? void loadConversationMessages(selectedConversationId) : undefined}
+                />
               </>
             ) : (
               <>
@@ -304,6 +719,7 @@ export default function ChatWorkspace() {
 type SidebarContentProps = {
   conversations: ConversationItem[];
   selectedConversationId: string | null;
+  busyByConversationId: Record<string, boolean>;
   isLoading: boolean;
   isRefreshing: boolean;
   errorMessage: string | null;
@@ -319,6 +735,7 @@ type SidebarContentProps = {
 function SidebarContent({
   conversations,
   selectedConversationId,
+  busyByConversationId,
   isLoading,
   isRefreshing,
   errorMessage,
@@ -392,6 +809,8 @@ function SidebarContent({
         {!isLoading && !errorMessage && conversations.length > 0
           ? conversations.map((conversation) => {
               const isSelected = selectedConversationId === conversation.id;
+              const isBusy = Boolean(busyByConversationId[conversation.id]);
+
               return (
                 <button
                   key={conversation.id}
@@ -403,7 +822,14 @@ function SidebarContent({
                   }`}
                   onClick={() => onSelectConversation(conversation.id)}
                 >
-                  <p className="truncate text-sm font-medium">{conversation.title}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium">{conversation.title}</p>
+                    {isBusy ? (
+                      <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                        Busy
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground">{formatUpdatedAt(conversation.updatedAt)}</p>
                 </button>
               );
@@ -450,5 +876,148 @@ function ConversationListLoading() {
         <div className="mt-2 h-2.5 w-2/5 animate-pulse rounded bg-muted" />
       </div>
     </div>
+  );
+}
+
+type ConnectionBadgeProps = {
+  state: "connecting" | "connected" | "reconnecting" | "disconnected";
+  reconnectAttempts: number;
+  hasConfigError: boolean;
+  onRetry: () => void;
+};
+
+function ConnectionBadge({ state, reconnectAttempts, hasConfigError, onRetry }: ConnectionBadgeProps) {
+  if (hasConfigError) {
+    return (
+      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        WebSocket unavailable
+      </span>
+    );
+  }
+
+  if (state === "connected") {
+    return null;
+  }
+
+  if (state === "disconnected") {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          Disconnected
+        </span>
+        <button
+          type="button"
+          className="rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium transition hover:bg-muted"
+          onClick={onRetry}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const label = state === "reconnecting" ? `Reconnecting… (${reconnectAttempts})` : "Connecting…";
+
+  return (
+    <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+      {label}
+    </span>
+  );
+}
+
+type MessageTimelineProps = {
+  isLoading: boolean;
+  errorMessage: string | null;
+  messages: ChatMessage[];
+  onRetry: () => void;
+};
+
+function MessageTimeline({ isLoading, errorMessage, messages, onRetry }: MessageTimelineProps) {
+  if (isLoading) {
+    return (
+      <div className="mt-5 space-y-3">
+        <MessageSkeleton />
+        <MessageSkeleton />
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="mt-5 rounded-xl border border-border bg-background p-4 text-sm">
+        <p className="text-muted-foreground">{errorMessage}</p>
+        <button
+          type="button"
+          className="mt-3 rounded-md border border-border px-3 py-1.5 font-medium transition hover:bg-muted"
+          onClick={onRetry}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (messages.length === 0) {
+    return (
+      <div className="mt-5 rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
+        No messages yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 space-y-4">
+      {messages.map((message) => (
+        <MessageRow key={message.id} message={message} />
+      ))}
+    </div>
+  );
+}
+
+function MessageSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-3 w-full animate-pulse rounded bg-muted" />
+      <div className="mt-2 h-3 w-5/6 animate-pulse rounded bg-muted" />
+    </div>
+  );
+}
+
+function roleLabel(role: ChatRole): string {
+  if (role === "assistant") {
+    return "Assistant";
+  }
+
+  if (role === "system") {
+    return "System";
+  }
+
+  return "You";
+}
+
+function MessageRow({ message }: { message: ChatMessage }) {
+  const sharedClassName = "rounded-xl border p-4";
+
+  const styleClassName =
+    message.role === "assistant"
+      ? "border-border bg-background"
+      : message.role === "system"
+        ? "border-border bg-muted/60"
+        : "border-border bg-muted/20";
+
+  return (
+    <article className={`${sharedClassName} ${styleClassName}`}>
+      <header className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold tracking-[0.12em] uppercase text-muted-foreground">
+          {roleLabel(message.role)}
+          {message.pending ? " (streaming)" : ""}
+        </p>
+        <p className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</p>
+      </header>
+      <div className="text-sm leading-6">
+        <MessageMarkdown content={message.content} />
+      </div>
+    </article>
   );
 }

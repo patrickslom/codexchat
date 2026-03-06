@@ -45,14 +45,14 @@
 - [x] Add loading/empty/error states for conversation list. (completed 2026-03-05)
 
 ## 5) Message Timeline + Streaming
-- [ ] Build message list rendering for `user|assistant|system`.
-- [ ] Add markdown rendering with code blocks and inline code.
-- [ ] Add copy button for code blocks.
-- [ ] Add WebSocket connection manager for `/ws`.
-- [ ] Handle `assistant_delta` streaming updates.
-- [ ] Handle `assistant_done` finalize event.
-- [ ] Handle websocket reconnect + basic retry UX.
-- [ ] Show per-conversation busy/lock state when active run exists.
+- [x] Build message list rendering for `user|assistant|system`. (completed 2026-03-05)
+- [x] Add markdown rendering with code blocks and inline code. (completed 2026-03-05)
+- [x] Add copy button for code blocks. (completed 2026-03-05)
+- [x] Add WebSocket connection manager for `/ws`. (completed 2026-03-05)
+- [x] Handle `assistant_delta` streaming updates. (completed 2026-03-05)
+- [x] Handle `assistant_done` finalize event. (completed 2026-03-05)
+- [x] Handle websocket reconnect + basic retry UX. (completed 2026-03-05)
+- [x] Show per-conversation busy/lock state when active run exists. (completed 2026-03-05)
 
 ## 6) Composer + Send Flow
 - [ ] Build multiline composer (`Enter` send, `Shift+Enter` newline).

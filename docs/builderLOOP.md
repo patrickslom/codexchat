@@ -681,3 +681,22 @@ EOF
 - Smoke check status:
 - Notes/blockers:
   - Host machine does not provide a local `python` binary; backend validation was executed in Docker containers.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/frontendTODO.md :: 5) Message Timeline + Streaming
+- Questions asked:
+  1) Should I implement all items in section 5 with production UI behavior now, even if backend `/ws` events are partially unavailable during smoke tests?
+  2) For markdown rendering, do you want `react-markdown` + `remark-gfm` with syntax highlighting via `rehype-highlight`?
+  3) For reconnect UX, should retries be automatic with exponential backoff and a small `Reconnecting…` status badge?
+- Assumptions:
+  - User requested full production UI behavior with graceful degradation when websocket events are partial/missing.
+  - Markdown uses `react-markdown` + `remark-gfm`, with a custom fenced code renderer and copy button.
+  - Reconnect behavior is automatic exponential backoff with capped interval, then terminal disconnected state plus manual retry.
+- Validation commands/results:
+  - `cd codexchat_front && npm run lint` ✅
+  - `cd codexchat_front && npm run build` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
