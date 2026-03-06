@@ -743,3 +743,23 @@ EOF
 - Deploy status:
 - Smoke check status:
 - Notes/blockers:
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/backendTODO.md :: 7) Thread Locking and Concurrency
+- Questions asked:
+  1) For lock ownership, should `locked_by` store websocket `connection_id` or authenticated `user_id`?
+  2) What lock TTL do you want for stale recovery: 60s, 120s, or 300s?
+  3) For busy-state events to UI, should I emit a dedicated websocket event (for example `thread_busy_state`) or include busy state only in existing `error`/`assistant_done` flows?
+- Assumptions:
+  - `locked_by` stores authenticated `user_id`; `connection_id` is stored under lock metadata for diagnostics.
+  - Lock TTL/stale recovery window is `120` seconds.
+  - WebSocket emits dedicated `thread_busy_state` events for busy-state truth, instead of overloading `error`/`assistant_done`.
+- Validation commands/results:
+  - `python3 -m compileall codexchat_back/app` ✅
+  - `python3 -m compileall codexchat_back/app/domains/chat/websocket.py codexchat_back/app/domains/locks/service.py` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - Existing unrelated frontend working tree changes left unstaged per guardrails.

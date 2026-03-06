@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -22,6 +21,7 @@ from app.domains.codex.runtime import (
     RuntimeUnavailableError,
     codex_process_runner,
 )
+from app.domains.locks.service import LockState, conversation_lock_service
 
 logger = logging.getLogger("app.api")
 
@@ -52,21 +52,15 @@ class ClientEventError(Exception):
         self.details = details
 
 
-@dataclass(slots=True)
-class ActiveTurn:
-    task: asyncio.Task[None]
-    owner_user_id: UUID
-
-
 class ChatWebSocketService:
     def __init__(self) -> None:
         self._state_lock = asyncio.Lock()
         self._subscriptions: dict[UUID, set[WebSocket]] = defaultdict(set)
         self._socket_subscriptions: dict[WebSocket, set[UUID]] = defaultdict(set)
-        self._active_turns: dict[UUID, ActiveTurn] = {}
 
     async def handle_connection(self, websocket: WebSocket, *, user: User) -> None:
         request_id = websocket.headers.get("x-request-id") or str(uuid4())
+        connection_id = str(uuid4())
         await websocket.accept()
         logger.info(
             "websocket_connected",
@@ -74,6 +68,7 @@ class ChatWebSocketService:
                 "event_data": {
                     "user_id": str(user.id),
                     "request_id": request_id,
+                    "connection_id": connection_id,
                 }
             },
         )
@@ -96,11 +91,23 @@ class ChatWebSocketService:
                     await self._handle_resume(websocket, event=event)
                     continue
 
-                await self._handle_send_message(websocket, user=user, request_id=request_id, event=event)
+                await self._handle_send_message(
+                    websocket,
+                    user=user,
+                    request_id=request_id,
+                    connection_id=connection_id,
+                    event=event,
+                )
         except WebSocketDisconnect:
             logger.info(
                 "websocket_disconnected",
-                extra={"event_data": {"user_id": str(user.id), "request_id": request_id}},
+                extra={
+                    "event_data": {
+                        "user_id": str(user.id),
+                        "request_id": request_id,
+                        "connection_id": connection_id,
+                    }
+                },
             )
         finally:
             await self._unsubscribe_socket(websocket)
@@ -130,6 +137,7 @@ class ChatWebSocketService:
             ).scalar_one_or_none()
 
         await self._subscribe_socket_to_conversation(websocket, conversation_id)
+        await self._emit_busy_state_for_socket(websocket, conversation_id=conversation_id)
 
         if latest_assistant_message is not None:
             await self._send_json(
@@ -150,6 +158,7 @@ class ChatWebSocketService:
         *,
         user: User,
         request_id: str,
+        connection_id: str,
         event: SendMessageEvent,
     ) -> None:
         conversation_id = event.conversation_id
@@ -175,35 +184,65 @@ class ChatWebSocketService:
                 return
 
         await self._subscribe_socket_to_conversation(websocket, conversation_id)
+        owner_token = str(uuid4())
+        with SessionLocal() as db:
+            acquire_result = conversation_lock_service.acquire(
+                db,
+                conversation_id=conversation_id,
+                user_id=user.id,
+                owner_token=owner_token,
+                metadata={
+                    "connection_id": connection_id,
+                    "request_id": request_id,
+                    "source": "websocket",
+                },
+            )
 
-        is_busy = False
-        async with self._state_lock:
-            if conversation_id in self._active_turns:
-                is_busy = True
-            else:
-                task = asyncio.create_task(
-                    self._run_turn(
-                        conversation_id=conversation_id,
-                        user_id=user.id,
-                        request_id=request_id,
-                        content=content,
-                    )
-                )
-                self._active_turns[conversation_id] = ActiveTurn(task=task, owner_user_id=user.id)
-
-        if is_busy:
+        if not acquire_result.acquired:
+            await self._broadcast_thread_busy_state(conversation_id, state=acquire_result.state)
             await self._send_error(
                 websocket,
                 code="THREAD_BUSY",
-                message="Conversation is already processing a turn",
-                details={"conversation_id": str(conversation_id), "busy": True},
+                message="thread busy",
+                details={
+                    "conversation_id": str(conversation_id),
+                    "busy": True,
+                    "locked_by": str(acquire_result.state.locked_by) if acquire_result.state.locked_by else None,
+                },
             )
             return
 
-    async def _run_turn(self, *, conversation_id: UUID, user_id: UUID, request_id: str, content: str) -> None:
+        await self._broadcast_thread_busy_state(conversation_id, state=acquire_result.state)
+        asyncio.create_task(
+            self._run_turn(
+                conversation_id=conversation_id,
+                user_id=user.id,
+                request_id=request_id,
+                content=content,
+                owner_token=owner_token,
+            )
+        )
+
+    async def _run_turn(
+        self,
+        *,
+        conversation_id: UUID,
+        user_id: UUID,
+        request_id: str,
+        content: str,
+        owner_token: str,
+    ) -> None:
         assistant_content = ""
         thread_id: str | None = None
         turn_id: str | None = None
+        heartbeat_stop = asyncio.Event()
+        heartbeat_task = asyncio.create_task(
+            self._heartbeat_lock(
+                conversation_id=conversation_id,
+                owner_token=owner_token,
+                stop_event=heartbeat_stop,
+            )
+        )
         try:
             with SessionLocal() as db:
                 conversation = get_conversation(db, conversation_id, include_archived=False)
@@ -364,8 +403,16 @@ class ChatWebSocketService:
                 message="Codex runtime failed while processing the turn",
             )
         finally:
-            async with self._state_lock:
-                self._active_turns.pop(conversation_id, None)
+            heartbeat_stop.set()
+            await heartbeat_task
+            with SessionLocal() as db:
+                conversation_lock_service.release(
+                    db,
+                    conversation_id=conversation_id,
+                    owner_token=owner_token,
+                )
+                current_state = conversation_lock_service.get_state(db, conversation_id=conversation_id)
+            await self._broadcast_thread_busy_state(conversation_id, state=current_state)
 
     async def _persist_partial_if_meaningful(
         self,
@@ -452,6 +499,58 @@ class ChatWebSocketService:
                     "conversation_id": str(conversation_id),
                     "busy": False,
                 },
+            },
+        )
+
+    async def _heartbeat_lock(
+        self,
+        *,
+        conversation_id: UUID,
+        owner_token: str,
+        stop_event: asyncio.Event,
+    ) -> None:
+        while True:
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=30)
+                return
+            except TimeoutError:
+                pass
+
+            with SessionLocal() as db:
+                keepalive_ok = conversation_lock_service.heartbeat(
+                    db,
+                    conversation_id=conversation_id,
+                    owner_token=owner_token,
+                )
+            if not keepalive_ok:
+                return
+
+    async def _emit_busy_state_for_socket(self, websocket: WebSocket, *, conversation_id: UUID) -> None:
+        with SessionLocal() as db:
+            state = conversation_lock_service.get_state(db, conversation_id=conversation_id)
+        await self._send_thread_busy_state(websocket, state=state)
+
+    async def _send_thread_busy_state(self, websocket: WebSocket, *, state: LockState) -> None:
+        await self._send_json(
+            websocket,
+            {
+                "type": "thread_busy_state",
+                "conversation_id": str(state.conversation_id),
+                "is_busy": state.is_busy,
+                "locked_by": str(state.locked_by) if state.locked_by else None,
+                "reason": state.reason,
+            },
+        )
+
+    async def _broadcast_thread_busy_state(self, conversation_id: UUID, *, state: LockState) -> None:
+        await self._broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "thread_busy_state",
+                "conversation_id": str(state.conversation_id),
+                "is_busy": state.is_busy,
+                "locked_by": str(state.locked_by) if state.locked_by else None,
+                "reason": state.reason,
             },
         )
 

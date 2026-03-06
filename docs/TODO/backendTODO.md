@@ -58,11 +58,11 @@
 - [x] Add process timeout and cleanup guardrails. (completed 2026-03-06)
 
 ## 7) Thread Locking and Concurrency
-- [ ] Implement per-conversation lock acquisition before turn execution.
-- [ ] If locked, reject send immediately with `thread busy` response (no FIFO queue).
-- [ ] Add lock timeout + stale lock recovery.
-- [ ] Expose lock/busy state to websocket/UI consumers.
-- [ ] Add lock release in success, error, and timeout paths.
+- [x] Implement per-conversation lock acquisition before turn execution. (completed 2026-03-06)
+- [x] If locked, reject send immediately with `thread busy` response (no FIFO queue). (completed 2026-03-06)
+- [x] Add lock timeout + stale lock recovery. (completed 2026-03-06)
+- [x] Expose lock/busy state to websocket/UI consumers. (completed 2026-03-06)
+- [x] Add lock release in success, error, and timeout paths. (completed 2026-03-06)
 
 ## 8) Files Domain (Local Storage Only)
 - [ ] Implement upload endpoint: `POST /api/conversations/:id/files`.
