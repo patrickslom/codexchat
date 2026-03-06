@@ -5,13 +5,16 @@ import json
 import logging
 from collections import defaultdict
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 
+from app.core.config import get_settings
+from app.core.errors import AppError
 from app.db.archive_queries import get_conversation
 from app.db.models import Message, User
 from app.db.session import SessionLocal
@@ -21,6 +24,7 @@ from app.domains.codex.runtime import (
     RuntimeUnavailableError,
     codex_process_runner,
 )
+from app.domains.files.service import assign_files_to_message
 from app.domains.locks.service import LockState, conversation_lock_service
 
 logger = logging.getLogger("app.api")
@@ -39,6 +43,7 @@ class SendMessageEvent(BaseModel):
     type: Literal["send_message"]
     conversation_id: UUID
     content: str
+    file_ids: list[UUID] = Field(default_factory=list)
 
 
 ClientEvent = ResumeEvent | SendMessageEvent
@@ -219,6 +224,7 @@ class ChatWebSocketService:
                 user_id=user.id,
                 request_id=request_id,
                 content=content,
+                file_ids=event.file_ids,
                 owner_token=owner_token,
             )
         )
@@ -230,11 +236,13 @@ class ChatWebSocketService:
         user_id: UUID,
         request_id: str,
         content: str,
+        file_ids: list[UUID],
         owner_token: str,
     ) -> None:
         assistant_content = ""
         thread_id: str | None = None
         turn_id: str | None = None
+        message_file_paths: list[str] = []
         heartbeat_stop = asyncio.Event()
         heartbeat_task = asyncio.create_task(
             self._heartbeat_lock(
@@ -255,22 +263,58 @@ class ChatWebSocketService:
                     return
 
                 thread_id = conversation.codex_thread_id
-                db.add(
-                    Message(
-                        conversation_id=conversation_id,
-                        role="user",
-                        content=content,
-                        metadata_json={
-                            "source": "websocket",
-                            "request_id": request_id,
-                            "user_id": str(user_id),
-                        },
-                    )
+                user_message = Message(
+                    conversation_id=conversation_id,
+                    role="user",
+                    content=content,
+                    metadata_json={
+                        "source": "websocket",
+                        "request_id": request_id,
+                        "user_id": str(user_id),
+                    },
                 )
+                db.add(user_message)
+                db.commit()
+                db.refresh(user_message)
+
+                attached_files = assign_files_to_message(
+                    db,
+                    conversation_id=conversation_id,
+                    message_id=user_message.id,
+                    file_ids=file_ids,
+                )
+
+                attached_refs = []
+                for attached_file in attached_files:
+                    attached_refs.append(
+                        {
+                            "id": str(attached_file.id),
+                            "name": attached_file.original_name,
+                            "storage_path": attached_file.storage_path,
+                            "download_path": f"/api/files/{attached_file.id}",
+                        }
+                    )
+                user_message.metadata_json = {
+                    **(user_message.metadata_json or {}),
+                    "attached_files": attached_refs,
+                }
+                uploads_root = Path(get_settings().uploads_path).expanduser().resolve()
+                message_file_paths = []
+                for attached_file in attached_files:
+                    resolved_path = (uploads_root / attached_file.storage_path).resolve()
+                    if uploads_root not in resolved_path.parents:
+                        raise AppError(
+                            status_code=400,
+                            code="BAD_REQUEST",
+                            message="Invalid attached file path",
+                            details={"file_id": str(attached_file.id)},
+                        )
+                    message_file_paths.append(str(resolved_path))
                 db.commit()
 
+            prompt = _build_prompt_with_files(content=content, file_paths=message_file_paths)
             turn_result = await codex_process_runner.run_turn(
-                prompt=content,
+                prompt=prompt,
                 existing_thread_id=thread_id,
                 conversation_id=conversation_id,
                 user_id=user_id,
@@ -327,6 +371,22 @@ class ChatWebSocketService:
                     "partial": False,
                 },
             )
+        except AppError as exc:
+            await self._broadcast_to_conversation(
+                conversation_id,
+                {
+                    "type": "error",
+                    "conversation_id": str(conversation_id),
+                    "code": exc.code,
+                    "message": exc.message,
+                    "details": {
+                        **exc.details,
+                        "conversation_id": str(conversation_id),
+                        "busy": False,
+                    },
+                },
+            )
+            return
         except RuntimeTimeoutError:
             await self._persist_partial_if_meaningful(
                 conversation_id=conversation_id,
@@ -597,7 +657,18 @@ def _normalize_client_payload(raw_payload: dict[str, object]) -> dict[str, objec
     normalized = dict(raw_payload)
     if "conversation_id" not in normalized and "conversationId" in normalized:
         normalized["conversation_id"] = normalized["conversationId"]
+    if "file_ids" not in normalized and "fileIds" in normalized:
+        normalized["file_ids"] = normalized["fileIds"]
     return normalized
+
+
+def _build_prompt_with_files(*, content: str, file_paths: list[str]) -> str:
+    if not file_paths:
+        return content
+    lines = [content, "", "Attached files (use these paths when reading/writing files):"]
+    for path in file_paths:
+        lines.append(f"- {path}")
+    return "\n".join(lines)
 
 
 def _parse_client_event(payload_text: str) -> ClientEvent:

@@ -8,8 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.db.archive_queries import get_conversation, list_conversations, list_messages_for_conversation
-from app.db.models import Conversation, Message, User
+from app.db.archive_queries import (
+    get_conversation,
+    list_conversations,
+    list_message_files_for_conversation,
+    list_messages_for_conversation,
+)
+from app.db.models import Conversation, File, Message, User
 from app.db.session import get_db
 from app.domains.auth.dependencies import get_current_user
 
@@ -36,6 +41,19 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     metadata_json: dict[str, object]
+    files: list["MessageFileResponse"]
+    created_at: datetime
+    archived_at: datetime | None
+    is_archived: bool
+
+
+class MessageFileResponse(BaseModel):
+    id: str
+    original_name: str
+    storage_path: str
+    download_path: str
+    mime_type: str
+    size_bytes: int
     created_at: datetime
     archived_at: datetime | None
     is_archived: bool
@@ -86,15 +104,33 @@ def _conversation_to_response(conversation: Conversation) -> ConversationRespons
     )
 
 
-def _message_to_response(message: Message) -> MessageResponse:
+def _message_to_response(message: Message, *, attached_files: list[File]) -> MessageResponse:
     return MessageResponse(
         id=str(message.id),
         role=message.role,
         content=message.content,
         metadata_json=message.metadata_json or {},
+        files=[
+            _file_to_response(file_row)
+            for file_row in attached_files
+        ],
         created_at=message.created_at,
         archived_at=message.archived_at,
         is_archived=message.archived_at is not None,
+    )
+
+
+def _file_to_response(file_row: File) -> MessageFileResponse:
+    return MessageFileResponse(
+        id=str(file_row.id),
+        original_name=file_row.original_name,
+        storage_path=file_row.storage_path,
+        download_path=f"/api/files/{file_row.id}",
+        mime_type=file_row.mime_type,
+        size_bytes=file_row.size_bytes,
+        created_at=file_row.created_at,
+        archived_at=file_row.archived_at,
+        is_archived=file_row.archived_at is not None,
     )
 
 
@@ -150,10 +186,18 @@ def get_conversation_detail(
         conversation_id,
         include_archived=include_archived,
     )
+    file_map = list_message_files_for_conversation(
+        db,
+        conversation_id,
+        include_archived=include_archived,
+    )
 
     detail = ConversationDetailResponse(
         **_conversation_to_response(conversation).model_dump(),
-        messages=[_message_to_response(message) for message in messages],
+        messages=[
+            _message_to_response(message, attached_files=file_map.get(message.id, []))
+            for message in messages
+        ],
     )
     return {"conversation": detail}
 

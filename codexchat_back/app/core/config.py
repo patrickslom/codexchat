@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ws_allowed_origins: tuple[str, ...] = Field(default=tuple(), alias="WS_ALLOWED_ORIGINS")
     enable_public_registration: bool = Field(default=False, alias="ENABLE_PUBLIC_REGISTRATION")
     codex_turn_timeout_seconds: int = Field(default=300, alias="CODEX_TURN_TIMEOUT_SECONDS")
+    uploads_path: str = Field(default="./uploads", alias="UPLOADS_PATH")
     admin_bootstrap_email: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_EMAIL")
     admin_bootstrap_password: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_PASSWORD")
     admin_bootstrap_password_hash: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_PASSWORD_HASH")
@@ -76,6 +77,14 @@ class Settings(BaseSettings):
         if value < 1:
             raise ValueError("CODEX_TURN_TIMEOUT_SECONDS must be >= 1")
         return value
+
+    @field_validator("uploads_path")
+    @classmethod
+    def validate_uploads_path(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("UPLOADS_PATH cannot be empty")
+        return normalized
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod

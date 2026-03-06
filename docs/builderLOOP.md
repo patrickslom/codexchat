@@ -783,3 +783,22 @@ EOF
 - Deploy status:
 - Smoke check status:
 - Notes/blockers:
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/backendTODO.md :: 8) Files Domain (Local Storage Only)
+- Questions asked:
+  1) Should uploaded files be linked to the most recent user message in the conversation when no explicit `message_id` is provided?
+  2) For downloads, should access be allowed to any authenticated user (shared visibility model), not only uploader?
+  3) Should backend reject files strictly over limit with HTTP `413` and a JSON error envelope?
+- Assumptions:
+  - If `message_id` is omitted, upload links to the latest active `user` message in the conversation.
+  - If no user message exists yet, upload is stored as conversation-level (`message_files.message_id = NULL`) with no guessed linkage.
+  - Download authorization follows conversation visibility, not uploader ownership.
+  - Oversized uploads are rejected with `413` + `FILE_TOO_LARGE` in the standard JSON error envelope, including max-size details.
+- Validation commands/results:
+  - `cd codexchat_back && python3 -m compileall app alembic` ✅
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:

@@ -65,13 +65,13 @@
 - [x] Add lock release in success, error, and timeout paths. (completed 2026-03-06)
 
 ## 8) Files Domain (Local Storage Only)
-- [ ] Implement upload endpoint: `POST /api/conversations/:id/files`.
-- [ ] Store files on local disk under `UPLOADS_PATH`.
-- [ ] Enforce user-configurable upload limit (default 15 MB).
-- [ ] Record file metadata in DB and link via `message_files`.
-- [ ] Implement download endpoint `GET /api/files/:id` with auth checks.
-- [ ] Ensure attached file paths are included in turn payload sent to Codex.
-- [ ] Ensure file references/paths are returned to frontend for message rendering.
+- [x] Implement upload endpoint: `POST /api/conversations/:id/files`. (completed 2026-03-06)
+- [x] Store files on local disk under `UPLOADS_PATH`. (completed 2026-03-06)
+- [x] Enforce user-configurable upload limit (default 15 MB). (completed 2026-03-06)
+- [x] Record file metadata in DB and link via `message_files`. (completed 2026-03-06)
+- [x] Implement download endpoint `GET /api/files/:id` with auth checks. (completed 2026-03-06)
+- [x] Ensure attached file paths are included in turn payload sent to Codex. (completed 2026-03-06)
+- [x] Ensure file references/paths are returned to frontend for message rendering. (completed 2026-03-06)
 
 ## 9) Settings Domain
 - [ ] Implement `GET /api/settings` and `PATCH /api/settings`.

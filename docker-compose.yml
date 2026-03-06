@@ -38,6 +38,7 @@ services:
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
       ENABLE_PUBLIC_REGISTRATION: ${ENABLE_PUBLIC_REGISTRATION:-false}
       CODEX_TURN_TIMEOUT_SECONDS: ${CODEX_TURN_TIMEOUT_SECONDS:-300}
+      UPLOADS_PATH: ${UPLOADS_PATH:-/app/uploads}
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
       ADMIN_BOOTSTRAP_PASSWORD_HASH: ${ADMIN_BOOTSTRAP_PASSWORD_HASH:-}
@@ -47,6 +48,8 @@ services:
     networks:
       - n8n_default
       - codexchat_internal
+    volumes:
+      - codexchat_uploads_data:/app/uploads
     labels:
       - traefik.enable=true
       - traefik.docker.network=n8n_default
@@ -79,6 +82,7 @@ services:
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
       ENABLE_PUBLIC_REGISTRATION: ${ENABLE_PUBLIC_REGISTRATION:-false}
       CODEX_TURN_TIMEOUT_SECONDS: ${CODEX_TURN_TIMEOUT_SECONDS:-300}
+      UPLOADS_PATH: ${UPLOADS_PATH:-/app/uploads}
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
       ADMIN_BOOTSTRAP_PASSWORD_HASH: ${ADMIN_BOOTSTRAP_PASSWORD_HASH:-}
@@ -87,6 +91,8 @@ services:
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
     networks:
       - codexchat_internal
+    volumes:
+      - codexchat_uploads_data:/app/uploads
 
   codexchat_front:
     container_name: codexchat_front
@@ -117,3 +123,4 @@ networks:
 
 volumes:
   codexchat_db_data:
+  codexchat_uploads_data:

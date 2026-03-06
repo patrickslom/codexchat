@@ -144,10 +144,10 @@ class MessageFile(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    message_id: Mapped[uuid.UUID] = mapped_column(
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("messages.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     file_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

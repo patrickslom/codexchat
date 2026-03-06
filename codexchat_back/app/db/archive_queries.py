@@ -12,7 +12,7 @@ from typing import TypeVar
 from sqlalchemy import Select, func, select, update
 from sqlalchemy.orm import Session
 
-from app.db.models import Conversation, File, HeartbeatJob, Message
+from app.db.models import Conversation, File, HeartbeatJob, Message, MessageFile
 
 ArchivableModel = TypeVar(
     "ArchivableModel",
@@ -106,6 +106,27 @@ def list_files_for_conversation(
         only_archived=only_archived,
     )
     return list(db.execute(scoped).scalars())
+
+
+def list_message_files_for_conversation(
+    db: Session,
+    conversation_id: uuid.UUID,
+    *,
+    include_archived: bool = False,
+) -> dict[uuid.UUID | None, list[File]]:
+    stmt = (
+        select(MessageFile.message_id, File)
+        .join(File, File.id == MessageFile.file_id)
+        .where(File.conversation_id == conversation_id)
+        .order_by(File.created_at.asc())
+    )
+    if not include_archived:
+        stmt = stmt.where(File.archived_at.is_(None))
+
+    file_map: dict[uuid.UUID | None, list[File]] = {}
+    for message_id, file_row in db.execute(stmt):
+        file_map.setdefault(message_id, []).append(file_row)
+    return file_map
 
 
 def list_heartbeat_jobs_for_conversation(
