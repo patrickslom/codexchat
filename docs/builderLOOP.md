@@ -966,9 +966,15 @@ EOF
   - `cd codexchat_front && timeout 300s npm run lint` ✅
   - `cd codexchat_front && timeout 240s npx tsc --noEmit` ✅
   - `cd codexchat_front && timeout 420s npm run build` ✅
-- Commit:
-- Push:
+- Commit: `c4d340e` - feat(frontend): add dedicated heartbeat jobs route with CRUD and run history UI
+- Push: `origin/master` updated successfully
 - Deploy status:
+  - Lock coordination via `LOCK.md` ✅ (acquired as `FRONT`, then reset to unlocked template)
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
 - Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200 after initial transient `502`)
+  - `wss://todo.flounderboard.com/ws` ✅ reachable/auth-enforced (python websocket handshake returned HTTP 403 unauthenticated)
 - Notes/blockers:
   - None.
