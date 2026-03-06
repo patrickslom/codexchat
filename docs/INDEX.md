@@ -29,3 +29,6 @@
 
 - [gnomeCREDIT.md](/root/codexchat/docs/gnomeCREDIT.md)
   Credit/reference note for the garden gnome ASCII used in the setup experience.
+
+- [BROWSERUSE.md](/root/codexchat/docs/BROWSERUSE.md)
+  Browser automation guide for Chromium + Playwright setup, runtime dependencies, usage patterns, and troubleshooting.

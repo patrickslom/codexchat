@@ -29,16 +29,25 @@ function normalizeWebSocketUrl(value: string): string {
 
 function getConfiguredOrigin(): string | null {
   const fromEnv = process.env.NEXT_PUBLIC_APP_ORIGIN;
-  if (!fromEnv) {
+  if (!fromEnv || !fromEnv.trim()) {
     return null;
   }
-  return normalizeHttpBaseUrl(fromEnv);
+  try {
+    return normalizeHttpBaseUrl(fromEnv);
+  } catch {
+    // Fall back to same-origin runtime resolution when build-time origin is invalid.
+    return null;
+  }
 }
 
 export function getApiBaseUrl(): string {
   const explicitApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (explicitApiBaseUrl) {
-    return normalizeHttpBaseUrl(explicitApiBaseUrl);
+  if (explicitApiBaseUrl && explicitApiBaseUrl.trim()) {
+    try {
+      return normalizeHttpBaseUrl(explicitApiBaseUrl);
+    } catch {
+      // Fall through to safer defaults.
+    }
   }
 
   const configuredOrigin = getConfiguredOrigin();
@@ -51,8 +60,12 @@ export function getApiBaseUrl(): string {
 
 export function getWebSocketUrl(): string {
   const explicitWebSocketUrl = process.env.NEXT_PUBLIC_WS_URL;
-  if (explicitWebSocketUrl) {
-    return normalizeWebSocketUrl(explicitWebSocketUrl);
+  if (explicitWebSocketUrl && explicitWebSocketUrl.trim()) {
+    try {
+      return normalizeWebSocketUrl(explicitWebSocketUrl);
+    } catch {
+      // Fall through to safer defaults.
+    }
   }
 
   const configuredOrigin = getConfiguredOrigin();
@@ -71,4 +84,3 @@ export function getWebSocketUrl(): string {
     "Unable to resolve WebSocket URL. Set NEXT_PUBLIC_APP_ORIGIN or NEXT_PUBLIC_WS_URL.",
   );
 }
-
