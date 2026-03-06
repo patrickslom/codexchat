@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import secrets
+import string
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.db.models import Session as AuthSession
 from app.db.models import User
 from app.db.session import get_db
 from app.domains.auth.dependencies import get_current_admin_user
@@ -42,6 +45,11 @@ class AdminUserResponse(BaseModel):
     updated_at: datetime
 
 
+class AdminTemporaryPasswordResetResponse(BaseModel):
+    user: AdminUserResponse
+    temporary_password: str
+
+
 def _validate_role(role: str) -> str:
     normalized = role.strip().lower()
     if normalized not in {"user", "admin"}:
@@ -64,6 +72,21 @@ def _to_response(user: User) -> AdminUserResponse:
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
+
+
+def _generate_temporary_password(length: int = 20) -> str:
+    if length < 12:
+        length = 12
+    alphabet = string.ascii_letters + string.digits
+    required = [
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.digits),
+    ]
+    remaining = [secrets.choice(alphabet) for _ in range(length - len(required))]
+    chars = required + remaining
+    secrets.SystemRandom().shuffle(chars)
+    return "".join(chars)
 
 
 @router.post("/users")
@@ -143,3 +166,43 @@ def patch_user(
     db.commit()
     db.refresh(user)
     return {"user": _to_response(user)}
+
+
+@router.post("/users/{user_id}/temporary-password")
+def reset_user_temporary_password(
+    user_id: UUID,
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+) -> AdminTemporaryPasswordResetResponse:
+    user = db.get(User, user_id)
+    if user is None:
+        raise AppError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="NOT_FOUND",
+            message="User not found",
+            details={},
+        )
+
+    temporary_password = _generate_temporary_password()
+    now = datetime.now(tz=UTC)
+
+    user.password_hash = hash_password(temporary_password)
+    user.force_password_reset = True
+    user.updated_at = now
+
+    db.execute(
+        update(AuthSession)
+        .where(
+            AuthSession.user_id == user.id,
+            AuthSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return AdminTemporaryPasswordResetResponse(
+        user=_to_response(user),
+        temporary_password=temporary_password,
+    )

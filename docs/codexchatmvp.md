@@ -251,6 +251,7 @@ Later:
 - `POST /admin/users` (admin only)
 - `GET /admin/users` (admin only)
 - `PATCH /admin/users/:id` (admin only: disable/reset/role)
+- `POST /admin/users/:id/temporary-password` (admin only: generate temporary password + force reset + revoke sessions)
 
 - `GET /heartbeat-jobs` (MVP+)
 - `POST /heartbeat-jobs` (MVP+)

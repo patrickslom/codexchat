@@ -138,6 +138,7 @@ User management defaults:
 - Public self-signup is disabled by default.
 - Admin creates additional users from the web interface (`Settings -> Admin`).
 - New users should be forced to reset password on first login.
+- Admin temporary reset endpoint: `POST /api/admin/users/:id/temporary-password` (generates a one-time temporary password, forces reset on next login, and revokes active sessions).
 - SSH fallback for manual provisioning: `docker compose exec codexchat_back python scripts/create_user.py --email user@example.com --password 'change-me' --role user`
 
 Managed Traefik installer:

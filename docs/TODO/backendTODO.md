@@ -29,6 +29,7 @@
 - [x] `POST /api/admin/users` create user. (completed 2026-03-05)
 - [x] `GET /api/admin/users` list users. (completed 2026-03-05)
 - [x] `PATCH /api/admin/users/:id` update status/role/reset flags. (completed 2026-03-05)
+- [x] `POST /api/admin/users/:id/temporary-password` reset with generated temporary password and revoke active sessions. (completed 2026-03-06)
 - [x] Add forced password reset on first login for newly created users. (completed 2026-03-05)
 
 ## 4) Conversation and Message Domain
