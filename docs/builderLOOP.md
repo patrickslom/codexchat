@@ -656,3 +656,28 @@ EOF
 - Smoke check status:
 - Notes/blockers:
   - User requested an intermediate commit/push of pre-existing local frontend chat shell changes before this run was finalized.
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/backendTODO.md :: 4) Conversation and Message Domain
+- Questions asked:
+  1) Should conversation list/detail endpoints return archived items by default, or hide them unless explicitly requested?
+  2) For `POST /api/conversations`, should the initial title default to a generated value like `"New Conversation"` when none is provided?
+  3) For rename (`POST /api/conversations/:id/title`), should empty/whitespace-only titles be rejected with `400`?
+- Assumptions:
+  - Default behavior is active-only; archived conversations/messages are excluded unless `include_archived=true` is explicitly passed.
+  - New conversation title defaults to `New Conversation` when omitted or whitespace-only on create.
+  - Rename trims title server-side, rejects empty/whitespace-only with HTTP `400`, and enforces a max title length of 255.
+  - Shared visibility model remains global: any authenticated user can list/read/rename conversations without per-user ownership filtering.
+- Validation commands/results:
+  - `docker compose run --rm codexchat_back python -m compileall app` ✅
+  - `docker compose run --rm codexchat_back python -m compileall alembic` ✅
+  - `docker compose build codexchat_back` ✅
+  - `docker compose run --rm -T codexchat_back python - <<'PY' ...` (route registration probe for `/api/conversations*`) ✅
+  - `docker compose run --rm codexchat_back alembic upgrade head` ✅ (upgraded `20260305_09` -> `20260306_10`)
+  - `docker compose run --rm codexchat_back alembic current` ✅ (`20260306_10 (head)`)
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - Host machine does not provide a local `python` binary; backend validation was executed in Docker containers.

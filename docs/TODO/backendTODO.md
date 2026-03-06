@@ -32,13 +32,13 @@
 - [x] Add forced password reset on first login for newly created users. (completed 2026-03-05)
 
 ## 4) Conversation and Message Domain
-- [ ] Implement `GET /api/conversations` list conversations.
-- [ ] Implement `POST /api/conversations` create conversation.
-- [ ] Implement `GET /api/conversations/:id` fetch conversation and messages.
-- [ ] Implement `POST /api/conversations/:id/title` rename conversation.
-- [ ] Implement soft-delete/archive flags for conversations/messages.
-- [ ] Implement shared visibility model (all users can access all conversations/files).
-- [ ] Add conversation activity timestamps updates on each turn.
+- [x] Implement `GET /api/conversations` list conversations. (completed 2026-03-06)
+- [x] Implement `POST /api/conversations` create conversation. (completed 2026-03-06)
+- [x] Implement `GET /api/conversations/:id` fetch conversation and messages. (completed 2026-03-06)
+- [x] Implement `POST /api/conversations/:id/title` rename conversation. (completed 2026-03-06)
+- [x] Implement soft-delete/archive flags for conversations/messages. (completed 2026-03-06)
+- [x] Implement shared visibility model (all users can access all conversations/files). (completed 2026-03-06)
+- [x] Add conversation activity timestamps updates on each turn. (completed 2026-03-06)
 
 ## 5) WebSocket Messaging and Streaming
 - [ ] Implement websocket auth/session check for `/ws`.
