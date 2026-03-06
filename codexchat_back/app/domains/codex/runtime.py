@@ -332,6 +332,16 @@ class CodexProcessRunner:
             message = error_payload.get("message")
             if isinstance(message, str) and message.strip():
                 return message
+
+            nested_error = error_payload.get("error")
+            if isinstance(nested_error, dict):
+                nested_message = nested_error.get("message")
+                additional_details = nested_error.get("additionalDetails")
+                if isinstance(nested_message, str) and nested_message.strip():
+                    if isinstance(additional_details, str) and additional_details.strip():
+                        return f"{nested_message} ({additional_details})"
+                    return nested_message
+
             code = error_payload.get("code")
             if code is not None:
                 return f"Codex runtime error: {code}"
