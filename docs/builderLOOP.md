@@ -189,11 +189,18 @@ EOF
 - Validation commands/results:
   - `cd codexchat_front && npm run lint` ✅
   - `cd codexchat_front && npm run build` ✅
-- Commit:
-- Push:
+- Commit: `cf6b06f` - feat(frontend): deliver message timeline and resilient websocket streaming UX
+- Push: `origin/master` updated successfully
 - Deploy status:
+  - Lock coordination via `LOCK.md` ✅ (acquired as `FRONT`, then reset to unlocked template)
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
 - Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/ws` ✅ reachable/auth-enforced (HTTP 403 on unauthenticated websocket upgrade with valid key)
 - Notes/blockers:
+  - First post-deploy probes returned transient `502` on `/api/health` and `/ws`; retries passed after backend/router stabilization.
 
 - Date: 2026-03-05
 - Task completed: docs/TODO/frontendTODO.md :: 0) Project Bootstrap :: Add global style tokens for black/white theme and dark mode variables.
