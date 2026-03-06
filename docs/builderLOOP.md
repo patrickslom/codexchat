@@ -830,3 +830,30 @@ EOF
 - Deploy status:
 - Smoke check status:
 - Notes/blockers:
+
+- Date: 2026-03-06
+- Task completed: docs/TODO/frontendTODO.md :: 7) File Attachments UX
+- Questions asked:
+  1) Should I allow selecting multiple files per message in this first pass?
+  2) For assistant-returned files, should links open in a new tab (`target="_blank"`) by default?
+  3) If settings aren’t loaded yet, should frontend size validation default to `15 MB`?
+- Assumptions:
+  - Multiple file attachments are supported per message with simple multi-select UX and per-file remove before send.
+  - Assistant-returned file links open in a new tab with `target="_blank"` and `rel="noopener noreferrer"`.
+  - Frontend file-size validation defaults to 15 MB and is replaced by live `/api/settings` value when available.
+  - Backend remains source of truth for upload limit enforcement.
+- Validation commands/results:
+  - `cd codexchat_front && npm run lint` ✅
+  - `cd codexchat_front && npm run build` ✅
+- Commit: `71fb1c0` - feat(frontend): implement file attachments UX in chat composer and timeline
+- Push: `origin/master` updated successfully
+- Deploy status:
+  - Lock coordination via `LOCK.md` ✅ (acquired as `FRONT`, then reset to unlocked template)
+  - `docker compose build` ✅
+  - `docker compose up -d` ✅
+- Smoke check status:
+  - `https://todo.flounderboard.com/` ✅ (HTTP 200)
+  - `https://todo.flounderboard.com/api/health` ✅ (HTTP 200)
+  - `wss://todo.flounderboard.com/ws` ✅ reachable/auth-enforced (websocket handshake rejected with HTTP 403 when unauthenticated)
+- Notes/blockers:
+  - None.
