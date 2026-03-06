@@ -51,11 +51,15 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      NODE_PATH: ${CODEX_CONTAINER_NODE_MODULES_PATH:-/usr/local/lib/node_modules}
     networks:
       - n8n_default
       - codexchat_internal
     volumes:
       - codexchat_uploads_data:/app/uploads
+      - ${CODEX_HOST_NODE_PATH:-/usr/bin/node}:${CODEX_CONTAINER_NODE_PATH:-/usr/local/bin/node}:ro
+      - ${CODEX_HOST_NODE_MODULES_PATH:-/usr/lib/node_modules}:${CODEX_CONTAINER_NODE_MODULES_PATH:-/usr/local/lib/node_modules}:ro
+      - ${CODEX_HOST_AUTH_PATH:-/root/.codex}:${CODEX_CONTAINER_AUTH_PATH:-/root/.codex}:ro
     labels:
       - traefik.enable=true
       - traefik.docker.network=n8n_default
@@ -101,10 +105,14 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      NODE_PATH: ${CODEX_CONTAINER_NODE_MODULES_PATH:-/usr/local/lib/node_modules}
     networks:
       - codexchat_internal
     volumes:
       - codexchat_uploads_data:/app/uploads
+      - ${CODEX_HOST_NODE_PATH:-/usr/bin/node}:${CODEX_CONTAINER_NODE_PATH:-/usr/local/bin/node}:ro
+      - ${CODEX_HOST_NODE_MODULES_PATH:-/usr/lib/node_modules}:${CODEX_CONTAINER_NODE_MODULES_PATH:-/usr/local/lib/node_modules}:ro
+      - ${CODEX_HOST_AUTH_PATH:-/root/.codex}:${CODEX_CONTAINER_AUTH_PATH:-/root/.codex}:ro
 
   codexchat_front:
     container_name: codexchat_front

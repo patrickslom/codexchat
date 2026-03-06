@@ -62,8 +62,10 @@ await browser.close();
 ## Practical Notes
 - Use unique test users/emails per run to avoid state collisions.
 - Keep browser checks separate from API checks so failures are easier to isolate.
+- Run protocol checks first (`/api/health`, websocket upgrade probe) before browser checks so infra issues are separated from UI issues.
 - For websocket/chat checks, backend Codex runtime availability affects results; if Codex CLI is unavailable, UI may show runtime error instead of stream output.
 - Login lockout includes an IP-level key; lockout tests can unintentionally lock all subsequent logins from the same source IP during the test window.
+- Backend/worker containers are expected to use host-global Codex via bind mounts (host node binary, host global node_modules, host `~/.codex` auth). If this wiring breaks, browser chat may load but turn execution can fail at runtime.
 
 ## Troubleshooting
 - `ERR_MODULE_NOT_FOUND: playwright`:

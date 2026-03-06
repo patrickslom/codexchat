@@ -90,9 +90,12 @@ Dev/test option:
 
 What `./scripts/setup.sh` does:
 - checks Docker availability
-- checks Codex CLI is installed (can auto-install via `./scripts/install-codex.sh`)
+- prefers existing global Codex install (`/usr/bin`, `/usr/local/bin`, `/bin`)
+- falls back to any Codex found in PATH
+- only if no Codex install is found, offers auto-install via `./scripts/install-codex.sh`
 - checks Codex login status (can launch interactive `codex login`)
 - bootstraps `.env` from `.env.example`
+- writes Codex runtime mount paths to `.env` so containers reuse host-global Codex + auth
 - asks for access mode (`traefik` recommended, `ip` dev/test only)
 - auto-detects Traefik Docker network
 - offers managed Traefik install if missing
@@ -111,6 +114,9 @@ What `./scripts/install.sh` does:
 - `DATABASE_URL` - Postgres connection URL
 - `SESSION_SECRET` - long random secret for session signing
 - `CODEX_AUTH` - Codex auth configuration/token used on VPS
+- `CODEX_HOST_NODE_PATH` - host Node binary used to run Codex CLI
+- `CODEX_HOST_NODE_MODULES_PATH` - host global node_modules containing `@openai/codex`
+- `CODEX_HOST_AUTH_PATH` - host Codex auth directory (typically `~/.codex`)
 - `WORKSPACE_PATH` - workspace mounted into API/worker
 - `UPLOADS_PATH` - persistent file storage path (MVP local volume)
 
@@ -141,6 +147,7 @@ Managed Traefik installer:
 
 Managed Codex installer:
 - `./scripts/install-codex.sh` installs Codex CLI using npm (`@openai/codex`)
+- setup only offers this when no existing Codex install is detected
 - setup then requires login before continuing
 
 One-liner bootstrap installer:
@@ -153,15 +160,16 @@ One-liner bootstrap installer:
 ## Install Walkthrough
 
 1. Run `./scripts/setup.sh`.
-2. If Codex CLI is missing, setup offers to install it automatically.
-3. If Codex is not logged in, setup can start `codex login`.
-4. Setup asks access mode:
+2. Setup looks for global Codex first, then any PATH installation.
+3. If Codex is still missing, setup offers to install it automatically.
+4. If Codex is not logged in, setup can start `codex login`.
+5. Setup asks access mode:
    - `traefik` for production (recommended)
    - `ip` for dev/test (warning shown)
-5. If Traefik is missing and mode is `traefik`, setup offers managed Traefik install.
-6. Setup generates/updates `.env`, validates network/config, and starts containers.
-7. Open the printed URL on desktop or mobile and log in.
-8. Admin creates additional users from `Settings -> Admin` and shares temporary credentials.
+6. If Traefik is missing and mode is `traefik`, setup offers managed Traefik install.
+7. Setup generates/updates `.env`, validates network/config, and starts containers.
+8. Open the printed URL on desktop or mobile and log in.
+9. Admin creates additional users from `Settings -> Admin` and shares temporary credentials.
 
 ## User Flow
 

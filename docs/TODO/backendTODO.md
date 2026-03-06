@@ -109,8 +109,8 @@
 ## 13) Integration and Manual Verification Checklist
 - [x] Verify login + lockout behavior end-to-end. (completed 2026-03-06; CLI + browser login/lockout flow verified)
 - [ ] Verify admin bootstrap and admin user management endpoints. (blocked 2026-03-06: admin user management API verified, but bootstrap path was not explicitly re-validated in this run)
-- [ ] Verify websocket streaming for normal conversation turns. (blocked 2026-03-06: backend now runs Codex CLI but returns `CODEX_RUNTIME_ERROR`; runtime auth/config still required for successful turn completion)
-- [ ] Verify thread-busy reject behavior under concurrent sends. (blocked 2026-03-06: unable to hold an active turn long enough for busy-path verification while Codex runtime returns immediate runtime errors)
-- [ ] Verify uploads/downloads and path injection into Codex turns. (blocked 2026-03-06: upload/download verified; Codex path-injection effect cannot be confirmed until runtime turn completion succeeds)
+- [ ] Verify websocket streaming for normal conversation turns. (blocked 2026-03-06: Codex runtime availability/auth is now healthy in containers, but authenticated websocket turn-stream verification was not re-run in this pass)
+- [ ] Verify thread-busy reject behavior under concurrent sends. (blocked 2026-03-06: not re-run yet after Codex runtime wiring changes)
+- [ ] Verify uploads/downloads and path injection into Codex turns. (blocked 2026-03-06: upload/download path injection effect not re-verified after runtime wiring changes)
 - [x] Verify heartbeat worker runs independently from API responsiveness. (completed 2026-03-06; heartbeat run observed while repeated `/api/health` checks remained `200`)
 - [x] Verify `/api` + `/ws` routing compatibility with Traefik single-domain setup. (completed 2026-03-06; `/api/health` returned `200`; unauthenticated `/ws` upgrade returned `403`)

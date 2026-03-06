@@ -39,12 +39,87 @@ require_cmd() {
   fi
 }
 
+CODEX_DETECTED_KIND=""
+CODEX_BIN_PATH=""
+CODEX_NODE_PATH=""
+CODEX_NODE_MODULES_PATH=""
+CODEX_AUTH_PATH=""
+
+detect_codex_installation() {
+  CODEX_DETECTED_KIND=""
+  CODEX_BIN_PATH=""
+  CODEX_NODE_PATH=""
+  CODEX_NODE_MODULES_PATH=""
+  CODEX_AUTH_PATH=""
+
+  local candidate
+  for candidate in /usr/bin/codex /usr/local/bin/codex /bin/codex; do
+    if [ -x "$candidate" ]; then
+      CODEX_DETECTED_KIND="global"
+      CODEX_BIN_PATH="$candidate"
+      break
+    fi
+  done
+
+  if [ -z "$CODEX_BIN_PATH" ] && command -v codex >/dev/null 2>&1; then
+    CODEX_DETECTED_KIND="path"
+    CODEX_BIN_PATH="$(command -v codex)"
+  fi
+
+  if [ -z "$CODEX_BIN_PATH" ]; then
+    return 1
+  fi
+
+  local resolved_bin
+  resolved_bin="$(readlink -f "$CODEX_BIN_PATH" 2>/dev/null || printf '%s' "$CODEX_BIN_PATH")"
+
+  local modules_guess=""
+  if [[ "$resolved_bin" == */node_modules/@openai/codex/bin/codex.js ]]; then
+    modules_guess="${resolved_bin%/@openai/codex/bin/codex.js}"
+  elif command -v npm >/dev/null 2>&1; then
+    modules_guess="$(npm root -g 2>/dev/null || true)"
+  fi
+
+  if [ -z "$modules_guess" ] || [ ! -d "$modules_guess/@openai/codex" ]; then
+    return 1
+  fi
+  if [ ! -d "$modules_guess/@openai/codex/node_modules/@openai/codex-linux-x64" ]; then
+    return 1
+  fi
+
+  local node_guess=""
+  if command -v node >/dev/null 2>&1; then
+    node_guess="$(command -v node)"
+  fi
+  if [ -z "$node_guess" ] || [ ! -x "$node_guess" ]; then
+    return 1
+  fi
+
+  CODEX_NODE_MODULES_PATH="$(readlink -f "$modules_guess" 2>/dev/null || printf '%s' "$modules_guess")"
+  CODEX_NODE_PATH="$(readlink -f "$node_guess" 2>/dev/null || printf '%s' "$node_guess")"
+  CODEX_AUTH_PATH="$HOME/.codex"
+  if [ -d "$CODEX_AUTH_PATH" ]; then
+    CODEX_AUTH_PATH="$(readlink -f "$CODEX_AUTH_PATH" 2>/dev/null || printf '%s' "$CODEX_AUTH_PATH")"
+  fi
+
+  return 0
+}
+
+codex_cmd() {
+  "$CODEX_BIN_PATH" "$@"
+}
+
 ensure_codex_installed() {
-  if command -v codex >/dev/null 2>&1; then
+  if detect_codex_installation; then
+    if [ "$CODEX_DETECTED_KIND" = "global" ]; then
+      green "Using global Codex CLI: $CODEX_BIN_PATH"
+    else
+      green "Using Codex CLI from PATH: $CODEX_BIN_PATH"
+    fi
     return 0
   fi
 
-  yellow "Codex CLI is not installed."
+  yellow "Codex CLI was not found in global locations or PATH."
   local install_choice
   read -r -p "Install Codex CLI now? [Y/n]: " install_choice
   if [ -z "$install_choice" ] || [[ "$install_choice" =~ ^[Yy]$ ]]; then
@@ -58,14 +133,16 @@ ensure_codex_installed() {
     exit 1
   fi
 
-  if ! command -v codex >/dev/null 2>&1; then
-    red "Codex CLI is still unavailable in PATH."
+  if ! detect_codex_installation; then
+    red "Codex CLI is still unavailable after install."
     exit 1
   fi
+
+  green "Using Codex CLI: $CODEX_BIN_PATH"
 }
 
 ensure_codex_login() {
-  if codex login status >/dev/null 2>&1; then
+  if codex_cmd login status >/dev/null 2>&1; then
     return 0
   fi
 
@@ -73,14 +150,24 @@ ensure_codex_login() {
   local login_choice
   read -r -p "Start Codex login now? [Y/n]: " login_choice
   if [ -z "$login_choice" ] || [[ "$login_choice" =~ ^[Yy]$ ]]; then
-    codex login || true
+    codex_cmd login || true
   fi
 
-  if ! codex login status >/dev/null 2>&1; then
+  if ! codex_cmd login status >/dev/null 2>&1; then
     red "Codex login is required before continuing."
     yellow "Run: codex login   (or: codex login --device-auth)"
     exit 1
   fi
+}
+
+persist_codex_runtime_env() {
+  set_env "CODEX_HOST_NODE_PATH" "$CODEX_NODE_PATH"
+  set_env "CODEX_HOST_NODE_MODULES_PATH" "$CODEX_NODE_MODULES_PATH"
+  set_env "CODEX_HOST_AUTH_PATH" "$CODEX_AUTH_PATH"
+  set_env "CODEX_CONTAINER_NODE_PATH" "/usr/local/bin/node"
+  set_env "CODEX_CONTAINER_NODE_MODULES_PATH" "/usr/local/lib/node_modules"
+  set_env "CODEX_CONTAINER_AUTH_PATH" "/root/.codex"
+  green "Wrote Codex runtime mount paths to .env"
 }
 
 set_env() {
@@ -260,6 +347,8 @@ if [ ! -f .env ]; then
   cp .env.example .env
   green "Created .env from .env.example"
 fi
+
+persist_codex_runtime_env
 
 prompt_if_empty "APP_DOMAIN" "Enter APP_DOMAIN (example: chat.example.com)"
 choose_access_mode

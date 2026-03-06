@@ -325,6 +325,38 @@ function isLikelyNetworkFailure(error: unknown): boolean {
   return false;
 }
 
+function isAuthFailureStatus(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+function readCsrfToken(): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const match = document.cookie.match(/(?:^|;\s*)codexchat_csrf=([^;]+)/);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function withCsrfHeader(headers?: HeadersInit): HeadersInit | undefined {
+  const token = readCsrfToken();
+  if (!token) {
+    return headers;
+  }
+
+  const next = new Headers(headers);
+  next.set("x-csrf-token", token);
+  return next;
+}
+
 function createClientMessageId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `${prefix}-${crypto.randomUUID()}`;
@@ -467,6 +499,11 @@ export default function ChatWorkspace() {
           cache: "no-store",
         });
 
+        if (isAuthFailureStatus(response.status)) {
+          router.replace("/login");
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`Request failed with ${response.status}`);
         }
@@ -490,7 +527,7 @@ export default function ChatWorkspace() {
         setRefreshing(false);
       }
     },
-    [apiBaseUrl],
+    [apiBaseUrl, router],
   );
 
   const loadConversationMessages = useCallback(
@@ -504,6 +541,11 @@ export default function ChatWorkspace() {
           credentials: "include",
           cache: "no-store",
         });
+
+        if (isAuthFailureStatus(response.status)) {
+          router.replace("/login");
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`Request failed with ${response.status}`);
@@ -521,7 +563,7 @@ export default function ChatWorkspace() {
         setTimelineLoading(false);
       }
     },
-    [apiBaseUrl],
+    [apiBaseUrl, router],
   );
 
   useEffect(() => {
@@ -564,6 +606,11 @@ export default function ChatWorkspace() {
         },
       );
 
+      if (isAuthFailureStatus(response.status)) {
+        router.replace("/login");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`Request failed with ${response.status}`);
       }
@@ -585,7 +632,7 @@ export default function ChatWorkspace() {
         setSearchLoading(false);
       }
     }
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, router]);
 
   useEffect(() => {
     void searchConversations(debouncedConversationSearchQuery);
@@ -601,6 +648,10 @@ export default function ChatWorkspace() {
           credentials: "include",
           cache: "no-store",
         });
+        if (isAuthFailureStatus(response.status)) {
+          router.replace("/login");
+          return;
+        }
         if (!response.ok) {
           return;
         }
@@ -627,7 +678,7 @@ export default function ChatWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, router]);
 
   useEffect(() => {
     setSelectedConversationId(selectedFromQuery);
@@ -783,6 +834,7 @@ export default function ChatWorkspace() {
     const response = await fetch(`${apiBaseUrl}/conversations/${conversationId}/files`, {
       method: "POST",
       credentials: "include",
+      headers: withCsrfHeader(),
       body: formData,
     });
 
@@ -878,9 +930,9 @@ export default function ChatWorkspace() {
         method: "POST",
         credentials: "include",
         cache: "no-store",
-        headers: {
+        headers: withCsrfHeader({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({}),
       });
 

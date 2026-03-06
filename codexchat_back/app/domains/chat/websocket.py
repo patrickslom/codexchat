@@ -114,6 +114,22 @@ class ChatWebSocketService:
                     }
                 },
             )
+        except RuntimeError as exc:
+            # Some disconnect paths surface as RuntimeError instead of WebSocketDisconnect.
+            if "WebSocket is not connected" in str(exc):
+                logger.info(
+                    "websocket_disconnected",
+                    extra={
+                        "event_data": {
+                            "user_id": str(user.id),
+                            "request_id": request_id,
+                            "connection_id": connection_id,
+                            "reason": "not_connected_runtime",
+                        }
+                    },
+                )
+            else:
+                raise
         finally:
             await self._unsubscribe_socket(websocket)
 

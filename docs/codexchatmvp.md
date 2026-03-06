@@ -442,6 +442,7 @@ App-layer lockouts still required.
 - `REDIS_URL` (optional)
 - `SESSION_SECRET`
 - `CODEX_AUTH` (how Codex authenticates on the VPS; documented in README)
+- `CODEX_HOST_NODE_PATH` / `CODEX_HOST_NODE_MODULES_PATH` / `CODEX_HOST_AUTH_PATH` (host Codex runtime/auth mounts)
 - `WORKSPACE_PATH` (mounted path)
 - `UPLOADS_PATH` (local file storage path in MVP)
 - `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` (optional seed admin user)
@@ -463,7 +464,7 @@ App-layer lockouts still required.
 1) Run one-liner installer:
    - `bash <(curl -fsSL https://raw.githubusercontent.com/patrickslom/codexchat/master/scripts/install.sh)`
 2) Installer clones/updates repo and launches `./scripts/setup.sh`
-3) Script verifies prerequisites (Docker, Codex install/login) and can install Codex CLI if missing
+3) Script verifies prerequisites (Docker + Codex), preferring existing global Codex install first, then PATH installs; only offers install if no Codex is found
 4) Script asks for access mode:
    - `traefik` (recommended/production)
    - `ip` (dev/test only, with explicit warning)
@@ -473,7 +474,7 @@ App-layer lockouts still required.
 ### User-side setup story
 1) User runs one command on VPS (`curl | bash` installer)
 2) Installer checks out repo and starts setup flow
-3) Setup can install Codex CLI if missing and requires Codex login before proceeding
+3) Setup reuses host-global Codex by default, can install Codex CLI only when no installation exists, and requires Codex login before proceeding
 4) Setup configures access mode (Traefik or IP dev/test) and networking
 5) App boots with `codexchat_front`/`codexchat_back`/`codexchat_db` (and optional redis/worker)
 6) User opens app URL from phone or desktop browser

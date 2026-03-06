@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import WinkingLogo from "../components/winking-logo";
-import { hasSessionCookie } from "@/lib/auth-session";
+import { getAuthenticatedUser } from "@/lib/auth-session";
 import LoginForm from "./login-form";
 
 type LoginPageProps = {
@@ -9,7 +9,7 @@ type LoginPageProps = {
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  if (await hasSessionCookie()) {
+  if (await getAuthenticatedUser()) {
     redirect("/chat");
   }
 

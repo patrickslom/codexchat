@@ -37,6 +37,9 @@ export function useChatWebSocket({
   const reconnectTimerRef = useRef<number | null>(null);
   const attemptsRef = useRef(0);
   const shouldReconnectRef = useRef(true);
+  const onMessageRef = useRef(onMessage);
+  const onOpenRef = useRef(onOpen);
+  const onErrorRef = useRef(onError);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     enabled ? "connecting" : "disconnected",
@@ -86,6 +89,12 @@ export function useChatWebSocket({
   const connectRef = useRef<() => void>(() => {});
 
   useEffect(() => {
+    onMessageRef.current = onMessage;
+    onOpenRef.current = onOpen;
+    onErrorRef.current = onError;
+  }, [onError, onMessage, onOpen]);
+
+  useEffect(() => {
     shouldReconnectRef.current = true;
 
     if (!enabled) {
@@ -107,15 +116,15 @@ export function useChatWebSocket({
           attemptsRef.current = 0;
           setReconnectAttempts(0);
           setConnectionState("connected");
-          onOpen?.();
+          onOpenRef.current?.();
         };
 
         socket.onmessage = (event) => {
-          onMessage(event as MessageEvent<string>);
+          onMessageRef.current(event as MessageEvent<string>);
         };
 
         socket.onerror = () => {
-          onError?.();
+          onErrorRef.current?.();
         };
 
         socket.onclose = () => {
@@ -138,7 +147,7 @@ export function useChatWebSocket({
       clearReconnectTimer();
       closeSocket();
     };
-  }, [clearReconnectTimer, closeSocket, enabled, onError, onMessage, onOpen, scheduleReconnect, url]);
+  }, [clearReconnectTimer, closeSocket, enabled, scheduleReconnect, url]);
 
   const sendJsonMessage = useCallback((payload: unknown): boolean => {
     const socket = socketRef.current;

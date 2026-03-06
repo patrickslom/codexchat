@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import WinkingLogo from "./components/winking-logo";
-import { hasSessionCookie } from "@/lib/auth-session";
+import { getAuthenticatedUser } from "@/lib/auth-session";
 
 export default async function Home() {
-  if (await hasSessionCookie()) {
+  if (await getAuthenticatedUser()) {
     redirect("/chat");
   }
 
