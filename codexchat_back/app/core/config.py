@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     session_cookie_name: str = Field(default="codexchat_session", alias="SESSION_COOKIE_NAME")
     csrf_cookie_name: str = Field(default="codexchat_csrf", alias="CSRF_COOKIE_NAME")
     session_ttl_hours: int = Field(default=168, alias="SESSION_TTL_HOURS")
+    enable_public_registration: bool = Field(default=False, alias="ENABLE_PUBLIC_REGISTRATION")
+    admin_bootstrap_email: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_EMAIL")
+    admin_bootstrap_password: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_PASSWORD")
+    admin_bootstrap_password_hash: str | None = Field(default=None, alias="ADMIN_BOOTSTRAP_PASSWORD_HASH")
+    # Backward-compatible aliases for earlier bootstrap naming.
     admin_email: str | None = Field(default=None, alias="ADMIN_EMAIL")
     admin_password: str | None = Field(default=None, alias="ADMIN_PASSWORD")
     admin_password_hash: str | None = Field(default=None, alias="ADMIN_PASSWORD_HASH")

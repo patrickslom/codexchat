@@ -7,15 +7,18 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.models import User
 from app.db.session import get_db
 from app.domains.auth.dependencies import get_current_user
+from app.domains.auth.password import hash_password
 from app.domains.auth.lockout import lockout_service
 from app.domains.auth.password import verify_password
 from app.domains.auth.session import session_manager
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
 
 GENERIC_AUTH_MESSAGE = "Invalid email or password"
 
@@ -25,10 +28,16 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=4096)
 
 
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=4096)
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
     role: str
+    force_password_reset: bool
 
 
 def _resolve_client_ip(request: Request) -> str:
@@ -128,6 +137,7 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
             id=str(user.id),
             email=user.email,
             role=user.role,
+            force_password_reset=user.force_password_reset,
         )
     }
 
@@ -149,5 +159,47 @@ def me(current_user: User = Depends(get_current_user)) -> dict[str, UserResponse
             id=str(current_user.id),
             email=current_user.email,
             role=current_user.role,
+            force_password_reset=current_user.force_password_reset,
+        )
+    }
+
+
+@router.post("/register")
+def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, UserResponse]:
+    if not settings.enable_public_registration:
+        raise AppError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="REGISTRATION_DISABLED",
+            message="Public registration is disabled",
+            details={},
+        )
+
+    email = payload.email.strip().lower()
+    existing_user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if existing_user is not None:
+        raise AppError(
+            status_code=status.HTTP_409_CONFLICT,
+            code="USER_ALREADY_EXISTS",
+            message="User with this email already exists",
+            details={},
+        )
+
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        role="user",
+        is_active=True,
+        force_password_reset=False,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "user": UserResponse(
+            id=str(user.id),
+            email=user.email,
+            role=user.role,
+            force_password_reset=user.force_password_reset,
         )
     }

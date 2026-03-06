@@ -1,3 +1,145 @@
-from fastapi import APIRouter
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.errors import AppError
+from app.db.models import User
+from app.db.session import get_db
+from app.domains.auth.dependencies import get_current_admin_user
+from app.domains.auth.password import hash_password
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+class AdminUserCreateRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=4096)
+    role: str = Field(default="user")
+    force_password_reset: bool = Field(default=True)
+
+
+class AdminUserPatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: str | None = Field(default=None)
+    is_active: bool | None = Field(default=None)
+    force_password_reset: bool | None = Field(default=None)
+
+
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    role: str
+    is_active: bool
+    force_password_reset: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+def _validate_role(role: str) -> str:
+    normalized = role.strip().lower()
+    if normalized not in {"user", "admin"}:
+        raise AppError(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code="VALIDATION_ERROR",
+            message="Role must be one of: user, admin",
+            details={},
+        )
+    return normalized
+
+
+def _to_response(user: User) -> AdminUserResponse:
+    return AdminUserResponse(
+        id=str(user.id),
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        force_password_reset=user.force_password_reset,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    )
+
+
+@router.post("/users")
+def create_user(
+    payload: AdminUserCreateRequest,
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+) -> dict[str, AdminUserResponse]:
+    email = payload.email.strip().lower()
+    existing = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if existing is not None:
+        raise AppError(
+            status_code=status.HTTP_409_CONFLICT,
+            code="USER_ALREADY_EXISTS",
+            message="User with this email already exists",
+            details={},
+        )
+
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        role=_validate_role(payload.role),
+        is_active=True,
+        force_password_reset=payload.force_password_reset,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"user": _to_response(user)}
+
+
+@router.get("/users")
+def list_users(
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+) -> dict[str, list[AdminUserResponse]]:
+    users = db.execute(select(User).order_by(User.created_at.asc())).scalars().all()
+    return {"users": [_to_response(user) for user in users]}
+
+
+@router.patch("/users/{user_id}")
+def patch_user(
+    user_id: UUID,
+    payload: AdminUserPatchRequest,
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+) -> dict[str, AdminUserResponse]:
+    user = db.get(User, user_id)
+    if user is None:
+        raise AppError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="NOT_FOUND",
+            message="User not found",
+            details={},
+        )
+
+    has_changes = False
+    if payload.role is not None:
+        user.role = _validate_role(payload.role)
+        has_changes = True
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+        has_changes = True
+    if payload.force_password_reset is not None:
+        user.force_password_reset = payload.force_password_reset
+        has_changes = True
+
+    if not has_changes:
+        raise AppError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="BAD_REQUEST",
+            message="No updates were provided",
+            details={},
+        )
+
+    user.updated_at = datetime.now(tz=UTC)
+    db.commit()
+    db.refresh(user)
+    return {"user": _to_response(user)}

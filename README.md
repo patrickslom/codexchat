@@ -116,7 +116,10 @@ What `./scripts/install.sh` does:
 
 Optional:
 - `REDIS_URL` - recommended for lockouts/rate counters
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` - seed first user
+- `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` - seed first admin on first startup
+- `ADMIN_BOOTSTRAP_PASSWORD_HASH` - optional pre-hashed Argon2 password for bootstrap admin
+- `ENABLE_PUBLIC_REGISTRATION` - `false` by default; must be explicitly set to `true` to enable `/api/auth/register`
+- Backward-compatible aliases: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_PASSWORD_HASH`
 
 Defaults and limits:
 - YOLO mode is available to all users (high risk; use carefully)
@@ -129,6 +132,7 @@ User management defaults:
 - Public self-signup is disabled by default.
 - Admin creates additional users from the web interface (`Settings -> Admin`).
 - New users should be forced to reset password on first login.
+- SSH fallback for manual provisioning: `docker compose exec codexchat_back python scripts/create_user.py --email user@example.com --password 'change-me' --role user`
 
 Managed Traefik installer:
 - `./scripts/install-traefik.sh` installs a minimal Traefik stack (`codexchat_traefik`)

@@ -21,9 +21,11 @@ def seed_defaults(db: Session) -> dict[str, bool]:
         db.add(Settings(id=1))
         seeded_settings = True
 
-    admin_email = (settings.admin_email or "").strip().lower()
-    admin_password_hash = (settings.admin_password_hash or "").strip()
-    admin_password = settings.admin_password or ""
+    admin_email = (settings.admin_bootstrap_email or settings.admin_email or "").strip().lower()
+    admin_password_hash = (
+        settings.admin_bootstrap_password_hash or settings.admin_password_hash or ""
+    ).strip()
+    admin_password = settings.admin_bootstrap_password or settings.admin_password or ""
     if admin_email and (admin_password_hash or admin_password):
         existing_admin = db.execute(select(User).where(User.email == admin_email)).scalar_one_or_none()
         if existing_admin is None:

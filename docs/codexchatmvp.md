@@ -444,7 +444,10 @@ App-layer lockouts still required.
 - `CODEX_AUTH` (how Codex authenticates on the VPS; documented in README)
 - `WORKSPACE_PATH` (mounted path)
 - `UPLOADS_PATH` (local file storage path in MVP)
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` (optional seed user)
+- `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` (optional seed admin user)
+- `ADMIN_BOOTSTRAP_PASSWORD_HASH` (optional pre-hashed bootstrap password)
+- `ENABLE_PUBLIC_REGISTRATION` (`false` by default)
+- Backward-compatible aliases: `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_PASSWORD_HASH`
 
 ### Volumes
 - `db_data`
@@ -481,7 +484,7 @@ App-layer lockouts still required.
 ### Admin bootstrap
 Pick one:
 - Seed a single admin user via env on first run
-- Or provide a CLI: `docker compose exec codexchat_back ./bin/create-user`
+- Or use CLI fallback from SSH: `docker compose exec codexchat_back python scripts/create_user.py --email admin@example.com --password 'change-me' --role admin`
 
 Recommended default:
 - First user is created via SSH/VPS shell and is admin.

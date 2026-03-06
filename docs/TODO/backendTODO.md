@@ -22,14 +22,14 @@
 - [x] Add generic auth error responses (no user enumeration). (completed 2026-03-05)
 
 ## 3) Admin Bootstrap and User Management
-- [ ] Implement startup bootstrap for first admin (env or CLI path).
-- [ ] Implement CLI user creation command for SSH bootstrap (`create-user`).
-- [ ] Disable public registration by default.
-- [ ] Implement admin-only endpoints:
-- [ ] `POST /api/admin/users` create user.
-- [ ] `GET /api/admin/users` list users.
-- [ ] `PATCH /api/admin/users/:id` update status/role/reset flags.
-- [ ] Add forced password reset on first login for newly created users.
+- [x] Implement startup bootstrap for first admin (env or CLI path). (completed 2026-03-05)
+- [x] Implement CLI user creation command for SSH bootstrap (`create-user`). (completed 2026-03-05)
+- [x] Disable public registration by default. (completed 2026-03-05)
+- [x] Implement admin-only endpoints: (completed 2026-03-05)
+- [x] `POST /api/admin/users` create user. (completed 2026-03-05)
+- [x] `GET /api/admin/users` list users. (completed 2026-03-05)
+- [x] `PATCH /api/admin/users/:id` update status/role/reset flags. (completed 2026-03-05)
+- [x] Add forced password reset on first login for newly created users. (completed 2026-03-05)
 
 ## 4) Conversation and Message Domain
 - [ ] Implement `GET /api/conversations` list conversations.

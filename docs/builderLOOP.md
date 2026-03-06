@@ -614,3 +614,25 @@ EOF
 - Notes/blockers:
   - Local host Python environment does not include new backend dependencies; runtime validation was executed in Docker instead.
   - First post-restart external probes to `/api/health` and `/ws` returned transient `502`; retries passed after Traefik/backend convergence.
+
+- Date: 2026-03-05
+- Task completed: docs/TODO/backendTODO.md :: 3) Admin Bootstrap and User Management
+- Questions asked:
+  1) Should first-admin bootstrap use both env-based auto-create (`ADMIN_BOOTSTRAP_EMAIL`/`ADMIN_BOOTSTRAP_PASSWORD`) and a CLI fallback path in the same run?
+  2) For `create-user`, do you want a non-interactive CLI (`--email --password --role`) only, or also interactive prompts if flags are missing?
+  3) For public registration, should `POST /api/auth/register` return `403` by default and be toggled only by an explicit env flag?
+- Assumptions:
+  - Implement both env bootstrap and CLI fallback in one run.
+  - `scripts/create_user.py` supports flags-first flow and interactive fallback only when TTY is available.
+  - Public registration is disabled by default and enabled only when `ENABLE_PUBLIC_REGISTRATION=true`.
+- Validation commands/results:
+  - `docker compose run --rm codexchat_back python -m compileall app scripts` ✅
+  - `docker compose run --rm -T codexchat_back python scripts/create_user.py --help` ✅
+  - `docker compose run --rm -T codexchat_back python scripts/db_seed.py` ✅ (`{"seeded_admin": false, "seeded_settings": false}`)
+  - `docker compose run --rm -T codexchat_back python -c "from app.main import app; print('app_ok', len(app.routes))"` ✅ (`app_ok 15`)
+- Commit:
+- Push:
+- Deploy status:
+- Smoke check status:
+- Notes/blockers:
+  - Existing unrelated frontend working tree changes left unstaged per guardrails.
