@@ -192,7 +192,8 @@ Codex integration model:
 
 - ChatGPT-like layout on desktop and mobile.
 - Full-screen sidebar drawer on mobile (hamburger menu).
-- Composer fixed at bottom with safe-area support.
+- Composer fixed at bottom with Lucide message/attachment/send icons.
+- Composer includes safe-area + keyboard-aware bottom offset handling on iOS and Android so the active input remains visible while typing.
 - New/resume flows work the same across devices.
 
 ## Theme

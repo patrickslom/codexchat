@@ -3,7 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import ThemeToggle from "@/app/components/theme-toggle";
+import {
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  Paperclip,
+  Search,
+  SendHorizontal,
+  Settings,
+  SquarePen,
+  X,
+} from "lucide-react";
+import WinkingLogo from "@/app/components/winking-logo";
 import { useChatWebSocket } from "@/hooks/use-chat-websocket";
 import { getApiBaseUrl, getWebSocketUrl } from "@/lib/network-config";
 import MessageMarkdown from "@/components/chat/message-markdown";
@@ -365,6 +376,32 @@ function createClientMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
+function parseIntroQuotes(markdown: string): string[] {
+  return markdown
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => Boolean(line) && !line.startsWith("#"))
+    .map((line) => {
+      if (line.startsWith("- ")) {
+        return line.slice(2).trim();
+      }
+      const numbered = line.match(/^\d+\.\s+(.*)$/);
+      if (numbered?.[1]) {
+        return numbered[1].trim();
+      }
+      return line;
+    })
+    .filter((line) => Boolean(line));
+}
+
+function pickRandomQuote(quotes: string[]): string {
+  if (quotes.length === 0) {
+    return "What are we building today?";
+  }
+  const index = Math.floor(Math.random() * quotes.length);
+  return quotes[index];
+}
+
 function parseEventPayload(raw: string): ChatEvent | null {
   try {
     const payload = JSON.parse(raw) as unknown;
@@ -401,7 +438,8 @@ function isRetryableSendErrorCode(code: string): boolean {
     code === "THREAD_BUSY" ||
     code === "CONVERSATION_BUSY" ||
     code === "VALIDATION_ERROR" ||
-    code === "NOT_FOUND"
+    code === "NOT_FOUND" ||
+    code === "THREAD_RESUME_FAILED"
   );
 }
 
@@ -412,6 +450,7 @@ export default function ChatWorkspace() {
   const selectedFromQuery = searchParams.get("conversationId");
 
   const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoading, setLoading] = useState(true);
   const [isRefreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -437,8 +476,12 @@ export default function ChatWorkspace() {
   const [uploadLimitMb, setUploadLimitMb] = useState(DEFAULT_UPLOAD_LIMIT_MB);
   const [sendErrorByConversationId, setSendErrorByConversationId] = useState<Record<string, string | null>>({});
   const [isCreatingConversation, setCreatingConversation] = useState(false);
+  const [composerBottomOffset, setComposerBottomOffset] = useState(0);
+  const [introQuote, setIntroQuote] = useState("What are we building today?");
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
   const wsResolution = useMemo(() => {
     try {
@@ -449,11 +492,10 @@ export default function ChatWorkspace() {
     }
   }, []);
 
-  const selectedConversation =
-    conversations.find((item) => item.id === selectedConversationId) ?? null;
   const normalizedSearchQuery = debouncedConversationSearchQuery.trim();
   const isSearchActive = normalizedSearchQuery.length > 0;
   const visibleConversations = isSearchActive ? searchResults : conversations;
+  const shouldShowIntroQuote = !selectedConversationId;
 
   const selectedTimelineMessages = useMemo(() => {
     if (!selectedConversationId) {
@@ -1199,6 +1241,11 @@ export default function ChatWorkspace() {
     const sent = await submitMessage(composerValue);
     if (sent) {
       setComposerValue("");
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur();
+      }
+      setComposerBottomOffset(0);
     }
   }, [composerValue, submitMessage]);
 
@@ -1267,28 +1314,157 @@ export default function ChatWorkspace() {
     });
   }, [connectionState, selectedConversationId, sendJsonMessage]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadIntroQuote = async () => {
+      try {
+        const response = await fetch("/content/chat-intro-quotes.md", {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const markdown = await response.text();
+        const parsed = parseIntroQuotes(markdown);
+        if (mounted) {
+          setIntroQuote(pickRandomQuote(parsed));
+        }
+      } catch {
+        // Keep fallback quote on load failure.
+      }
+    };
+
+    void loadIntroQuote();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const saved = window.localStorage.getItem("chat_sidebar_collapsed");
+    if (saved === "1") {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem("chat_sidebar_collapsed", isSidebarCollapsed ? "1" : "0");
+  }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    if (!viewport) {
+      return;
+    }
+
+    const updateBottomOffset = () => {
+      const keyboardInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      setComposerBottomOffset(Math.round(keyboardInset));
+    };
+
+    updateBottomOffset();
+    viewport.addEventListener("resize", updateBottomOffset);
+    viewport.addEventListener("scroll", updateBottomOffset);
+    window.addEventListener("resize", updateBottomOffset);
+    window.addEventListener("orientationchange", updateBottomOffset);
+
+    return () => {
+      viewport.removeEventListener("resize", updateBottomOffset);
+      viewport.removeEventListener("scroll", updateBottomOffset);
+      window.removeEventListener("resize", updateBottomOffset);
+      window.removeEventListener("orientationchange", updateBottomOffset);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateAutoScrollIntent = () => {
+      const viewportBottom = window.scrollY + window.innerHeight;
+      const pageHeight = document.documentElement.scrollHeight;
+      shouldAutoScrollRef.current = pageHeight - viewportBottom < 220;
+    };
+
+    updateAutoScrollIntent();
+    window.addEventListener("scroll", updateAutoScrollIntent, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", updateAutoScrollIntent);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConversationId || timelineLoading || !shouldAutoScrollRef.current) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  }, [selectedConversationId, selectedTimelineMessages, timelineLoading]);
+
+  const onSearchAction = useCallback(() => {
+    setSidebarCollapsed(false);
+    window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+  }, []);
+
   return (
-    <div className="min-h-screen min-h-dvh bg-background text-foreground md:grid md:grid-cols-[320px_1fr]">
-      <aside className="hidden border-r border-border bg-muted/40 md:flex md:min-h-screen md:min-h-dvh md:flex-col">
-        <SidebarContent
-          conversations={visibleConversations}
-          searchQuery={conversationSearchQuery}
-          isSearchActive={isSearchActive}
-          isSearchLoading={isSearchLoading}
-          searchErrorMessage={searchErrorMessage}
-          selectedConversationId={selectedConversationId}
-          busyByConversationId={busyByConversationId}
-          isLoading={isLoading}
-          isRefreshing={isRefreshing}
-          errorMessage={errorMessage}
-          listRef={listRef}
-          onConversationListScroll={onConversationListScroll}
-          onSelectConversation={onSelectConversation}
-          onNewChat={onNewChat}
-          onSearchChange={setConversationSearchQuery}
-          onRetrySearch={() => void searchConversations(debouncedConversationSearchQuery)}
-          onRetry={() => void loadConversations("refresh")}
-        />
+    <div
+      className={`min-h-screen min-h-dvh bg-background text-foreground md:grid ${
+        isSidebarCollapsed ? "md:grid-cols-[78px_1fr]" : "md:grid-cols-[320px_1fr]"
+      }`}
+    >
+      <aside className="hidden border-r border-border bg-muted/40 md:sticky md:top-0 md:flex md:h-screen md:flex-col">
+        {isSidebarCollapsed ? (
+          <CollapsedSidebarContent
+            onExpand={() => setSidebarCollapsed(false)}
+            onSearchAction={onSearchAction}
+            onNewChat={onNewChat}
+          />
+        ) : (
+          <SidebarContent
+            conversations={visibleConversations}
+            searchQuery={conversationSearchQuery}
+            isSearchActive={isSearchActive}
+            isSearchLoading={isSearchLoading}
+            searchErrorMessage={searchErrorMessage}
+            selectedConversationId={selectedConversationId}
+            busyByConversationId={busyByConversationId}
+            isLoading={isLoading}
+            isRefreshing={isRefreshing}
+            errorMessage={errorMessage}
+            listRef={listRef}
+            searchInputRef={searchInputRef}
+            onConversationListScroll={onConversationListScroll}
+            onSelectConversation={onSelectConversation}
+            onNewChat={onNewChat}
+            onSearchChange={setConversationSearchQuery}
+            onRetrySearch={() => void searchConversations(debouncedConversationSearchQuery)}
+            onRetry={() => void loadConversations("refresh")}
+            onCollapse={() => setSidebarCollapsed(true)}
+          />
+        )}
       </aside>
 
       <div className="min-w-0">
@@ -1299,10 +1475,13 @@ export default function ChatWorkspace() {
             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-lg"
             onClick={() => setDrawerOpen(true)}
           >
-            ☰
+            <Menu className="h-4 w-4" />
           </button>
-          <p className="text-sm font-semibold tracking-[0.14em] uppercase">CodexChat</p>
-          <ThemeToggle />
+          <Link href="/chat" className="inline-flex items-center gap-2">
+            <WinkingLogo size={24} />
+            <span className="text-sm font-semibold tracking-[0.14em] uppercase">CodexChat</span>
+          </Link>
+          <span className="h-9 w-9" aria-hidden />
         </header>
 
         {isDrawerOpen ? (
@@ -1326,6 +1505,7 @@ export default function ChatWorkspace() {
                 isRefreshing={isRefreshing}
                 errorMessage={errorMessage}
                 listRef={listRef}
+                searchInputRef={searchInputRef}
                 onConversationListScroll={onConversationListScroll}
                 onSelectConversation={onSelectConversation}
                 onNewChat={onNewChat}
@@ -1339,74 +1519,55 @@ export default function ChatWorkspace() {
           </div>
         ) : null}
 
-        <main className="mx-auto flex min-h-[calc(100vh-56px)] min-h-[calc(100dvh-56px)] w-full max-w-5xl flex-col px-4 py-6 sm:px-6 md:min-h-screen md:min-h-dvh md:py-8">
-          <section className="rounded-2xl border border-border bg-muted/30 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground">
-                Conversation
-              </p>
-              <ConnectionBadge
-                state={connectionState}
-                reconnectAttempts={reconnectAttempts}
-                hasConfigError={Boolean(wsResolution.error)}
-                onRetry={retryNow}
-              />
-            </div>
-
-            {selectedConversation ? (
-              <>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                    {selectedConversation.title}
-                  </h1>
-                  {selectedConversationBusy ? (
-                    <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      Busy
-                    </span>
-                  ) : null}
-                </div>
-
-                {wsResolution.error ? (
-                  <p className="mt-2 text-sm text-muted-foreground">{wsResolution.error}</p>
-                ) : null}
-
-                <MessageTimeline
-                  isLoading={timelineLoading}
-                  errorMessage={timelineError}
-                  messages={selectedTimelineMessages}
-                  selectedConversationId={selectedConversationId}
-                  onRetryFailedMessage={onRetryFailedMessage}
-                  onRetry={() => selectedConversationId ? void loadConversationMessages(selectedConversationId) : undefined}
-                />
-              </>
-            ) : (
-              <>
-                <h1 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">New chat</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Start a new conversation from here. Select an existing chat in the sidebar to resume it.
-                </p>
-              </>
-            )}
-
-            <ComposerPanel
-              value={composerValue}
-              setValue={setComposerValue}
-              onSubmit={onComposerSubmit}
-              disabled={!canSubmitComposer}
-              isBusy={selectedConversationBusy}
-              isCreatingConversation={isCreatingConversation}
-              isUploadingAttachments={isUploadingAttachments}
-              connectionState={connectionState}
+        <main className="mx-auto flex min-h-[calc(100vh-56px)] min-h-[calc(100dvh-56px)] w-full max-w-5xl flex-col px-4 py-6 pb-72 sm:px-6 md:min-h-screen md:min-h-dvh md:py-8 md:pb-72">
+          <div className="mb-3 flex justify-end">
+            <ConnectionBadge
+              state={connectionState}
+              reconnectAttempts={reconnectAttempts}
               hasConfigError={Boolean(wsResolution.error)}
-              sendError={selectedSendError}
-              selectedAttachments={attachmentDrafts}
-              attachmentError={attachmentError}
-              uploadLimitMb={uploadLimitMb}
-              onPickAttachments={onPickAttachments}
-              onRemoveAttachment={onRemoveAttachment}
+              onRetry={retryNow}
             />
-          </section>
+          </div>
+
+          {wsResolution.error && selectedConversationId ? (
+            <p className="mb-3 text-sm text-muted-foreground">{wsResolution.error}</p>
+          ) : null}
+
+          {shouldShowIntroQuote ? (
+            <div className="mt-6 rounded-xl border border-border bg-muted/30 px-5 py-6 text-center sm:px-6">
+              <p className="text-lg font-medium tracking-tight text-foreground sm:text-xl">
+                {introQuote}
+              </p>
+            </div>
+          ) : (
+            <MessageTimeline
+              isLoading={timelineLoading}
+              errorMessage={timelineError}
+              messages={selectedTimelineMessages}
+              selectedConversationId={selectedConversationId}
+              onRetryFailedMessage={onRetryFailedMessage}
+              onRetry={() => selectedConversationId ? void loadConversationMessages(selectedConversationId) : undefined}
+            />
+          )}
         </main>
+        <ComposerPanel
+          value={composerValue}
+          setValue={setComposerValue}
+          onSubmit={onComposerSubmit}
+          disabled={!canSubmitComposer}
+          isBusy={selectedConversationBusy}
+          isCreatingConversation={isCreatingConversation}
+          isUploadingAttachments={isUploadingAttachments}
+          connectionState={connectionState}
+          hasConfigError={Boolean(wsResolution.error)}
+          sendError={selectedSendError}
+          selectedAttachments={attachmentDrafts}
+          attachmentError={attachmentError}
+          onPickAttachments={onPickAttachments}
+          onRemoveAttachment={onRemoveAttachment}
+          bottomOffset={composerBottomOffset}
+          sidebarCollapsed={isSidebarCollapsed}
+        />
       </div>
     </div>
   );
@@ -1424,12 +1585,14 @@ type SidebarContentProps = {
   isRefreshing: boolean;
   errorMessage: string | null;
   listRef: React.RefObject<HTMLDivElement | null>;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   onConversationListScroll: () => void;
   onSelectConversation: (conversationId: string) => void;
   onNewChat: () => void;
   onSearchChange: (value: string) => void;
   onRetrySearch: () => void;
   onRetry: () => void;
+  onCollapse?: () => void;
   mobile?: boolean;
   onClose?: () => void;
 };
@@ -1446,23 +1609,35 @@ function SidebarContent({
   isRefreshing,
   errorMessage,
   listRef,
+  searchInputRef,
   onConversationListScroll,
   onSelectConversation,
   onNewChat,
   onSearchChange,
   onRetrySearch,
   onRetry,
+  onCollapse,
   mobile = false,
   onClose,
 }: SidebarContentProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
-        <Link href="/chat" className="text-sm font-semibold tracking-[0.18em] uppercase">
-          CodexChat
+        <Link href="/chat" className="inline-flex items-center gap-2 text-sm font-semibold tracking-[0.18em] uppercase">
+          <WinkingLogo size={24} />
+          <span>CodexChat</span>
         </Link>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          {!mobile ? (
+            <button
+              type="button"
+              aria-label="Collapse sidebar"
+              className="inline-flex h-9 w-9 items-center justify-center text-base text-muted-foreground transition hover:text-foreground"
+              onClick={onCollapse}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          ) : null}
           {mobile ? (
             <button
               type="button"
@@ -1489,6 +1664,7 @@ function SidebarContent({
           Search conversations
         </label>
         <input
+          ref={searchInputRef}
           id="conversation-search"
           type="search"
           value={searchQuery}
@@ -1588,24 +1764,80 @@ function SidebarContent({
           : null}
       </div>
 
-      <div className="mt-4 border-t border-border pt-4">
+      <div className="mt-4 shrink-0 border-t border-border bg-muted/40 pt-4">
         <div className="flex items-center justify-between gap-2">
           <Link
             href="/settings"
-            className="rounded-md px-2 py-1 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
+            <Settings className="h-4 w-4" />
             Settings
           </Link>
           <form method="post" action="/logout">
             <button
               type="submit"
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
             >
+              <LogOut className="h-4 w-4" />
               Log out
             </button>
           </form>
         </div>
         {isRefreshing ? <p className="mt-2 text-xs text-muted-foreground">Refreshing…</p> : null}
+      </div>
+    </div>
+  );
+}
+
+type CollapsedSidebarContentProps = {
+  onExpand: () => void;
+  onSearchAction: () => void;
+  onNewChat: () => void;
+};
+
+function CollapsedSidebarContent({
+  onExpand,
+  onSearchAction,
+  onNewChat,
+}: CollapsedSidebarContentProps) {
+  return (
+    <div className="flex h-full min-h-0 flex-col items-center gap-2 p-3">
+      <button
+        type="button"
+        aria-label="Expand sidebar"
+        className="mt-1 inline-flex h-10 w-10 items-center justify-center"
+        onClick={onExpand}
+      >
+        <WinkingLogo size={28} />
+      </button>
+
+      <div className="mt-2 flex flex-col items-center gap-2">
+        <button
+          type="button"
+          aria-label="Search conversations"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted"
+          onClick={onSearchAction}
+          title="Search conversations"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label="New chat"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted"
+          onClick={onNewChat}
+          title="New chat"
+        >
+          <SquarePen className="h-4 w-4" />
+        </button>
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted"
+          title="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   );
@@ -1767,9 +1999,10 @@ type ComposerPanelProps = {
   sendError: string | null;
   selectedAttachments: AttachmentDraft[];
   attachmentError: string | null;
-  uploadLimitMb: number;
   onPickAttachments: (files: FileList | null) => void;
   onRemoveAttachment: (attachmentId: string) => void;
+  bottomOffset: number;
+  sidebarCollapsed: boolean;
 };
 
 function ComposerPanel({
@@ -1785,9 +2018,10 @@ function ComposerPanel({
   sendError,
   selectedAttachments,
   attachmentError,
-  uploadLimitMb,
   onPickAttachments,
   onRemoveAttachment,
+  bottomOffset,
+  sidebarCollapsed,
 }: ComposerPanelProps) {
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1803,74 +2037,82 @@ function ComposerPanel({
     [disabled, onSubmit],
   );
 
-  let helperText = "Enter to send. Shift+Enter for newline.";
-  if (isCreatingConversation) {
-    helperText = "Creating conversation…";
-  } else if (isUploadingAttachments) {
-    helperText = "Uploading attachments…";
-  } else if (isBusy) {
-    helperText = "This conversation is busy.";
-  } else if (hasConfigError || connectionState !== "connected") {
-    helperText = "WebSocket is not connected.";
-  }
+  const statusText =
+    sendError ??
+    attachmentError ??
+    (isCreatingConversation
+      ? "Creating conversation…"
+      : isUploadingAttachments
+        ? "Uploading attachments…"
+        : isBusy
+          ? "This conversation is busy."
+          : hasConfigError || connectionState !== "connected"
+            ? "WebSocket is not connected."
+            : null);
 
   return (
-    <div className="mt-5 border-t border-border pt-4">
-      <label htmlFor="chat-composer" className="sr-only">
-        Message
-      </label>
-      <textarea
-        id="chat-composer"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={onKeyDown}
-        rows={3}
-        placeholder="Send a message…"
-        className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-foreground focus:ring-2 focus:ring-foreground/15"
-      />
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-muted">
-          <span>Attach files</span>
-          <input
-            type="file"
-            className="sr-only"
-            multiple
-            onChange={(event) => {
-              onPickAttachments(event.target.files);
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
-        <p className="text-xs text-muted-foreground">Max {uploadLimitMb} MB each</p>
-      </div>
-      {selectedAttachments.length > 0 ? (
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {selectedAttachments.map((draft) => (
-            <li key={draft.id} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs">
-              <span className="max-w-[12rem] truncate">{draft.file.name}</span>
-              <span className="text-muted-foreground">{formatFileSize(draft.file.size)}</span>
-              <button
-                type="button"
-                aria-label={`Remove ${draft.file.name}`}
-                className="rounded-full border border-border px-1.5 leading-none transition hover:bg-muted"
-                onClick={() => onRemoveAttachment(draft.id)}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{sendError ?? attachmentError ?? helperText}</p>
-        <button
-          type="button"
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={disabled}
-          onClick={() => void onSubmit()}
-        >
-          Send
-        </button>
+    <div
+      className={`fixed inset-x-0 z-30 ${sidebarCollapsed ? "md:left-[78px]" : "md:left-[320px]"}`}
+      style={{ bottom: `${bottomOffset + 10}px` }}
+    >
+      <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+        <div className="rounded-[999px] border border-border bg-background/95 p-2 shadow-2xl backdrop-blur">
+          <label htmlFor="chat-composer" className="sr-only">
+            Message
+          </label>
+          <div className="flex items-center gap-2">
+            <label className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground">
+              <span className="sr-only">Attach files</span>
+              <Paperclip className="h-4 w-4" />
+              <input
+                type="file"
+                className="sr-only"
+                multiple
+                onChange={(event) => {
+                  onPickAttachments(event.target.files);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <textarea
+              id="chat-composer"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              placeholder="Send a message…"
+              className="max-h-40 min-h-10 w-full resize-none rounded-full border border-border bg-background px-4 py-2 text-sm outline-none transition focus:border-foreground focus:ring-2 focus:ring-foreground/15"
+            />
+            <button
+              type="button"
+              aria-label="Send message"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={disabled}
+              onClick={() => void onSubmit()}
+            >
+              <SendHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+          {selectedAttachments.length > 0 ? (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {selectedAttachments.map((draft) => (
+                <li key={draft.id} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs">
+                  <span className="max-w-[12rem] truncate">{draft.file.name}</span>
+                  <span className="text-muted-foreground">{formatFileSize(draft.file.size)}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${draft.file.name}`}
+                    className="rounded-full border border-border p-1 leading-none transition hover:bg-muted"
+                    onClick={() => onRemoveAttachment(draft.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {statusText ? <p className="mt-2 px-1 text-center text-xs text-muted-foreground">{statusText}</p> : null}
+        </div>
       </div>
     </div>
   );
@@ -1888,62 +2130,85 @@ function roleLabel(role: ChatRole): string {
   return "You";
 }
 
-function MessageRow({ message, onRetry }: { message: ChatMessage; onRetry?: () => void }) {
-  const sharedClassName = "rounded-xl border p-4";
+function StreamingTrail() {
+  const [frame, setFrame] = useState(1);
 
-  const styleClassName =
-    message.role === "assistant"
-      ? "border-border bg-background"
-      : message.role === "system"
-        ? "border-border bg-muted/60"
-        : "border-border bg-muted/20";
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setFrame((previous) => (previous % 3) + 1);
+    }, 420);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   return (
-    <article className={`${sharedClassName} ${styleClassName}`}>
-      <header className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold tracking-[0.12em] uppercase text-muted-foreground">
-          {roleLabel(message.role)}
-          {message.pending ? " (streaming)" : message.deliveryStatus === "sending" ? " (sending)" : ""}
-        </p>
-        <p className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</p>
-      </header>
-      <div className="text-sm leading-6">
-        <MessageMarkdown content={message.content} />
-      </div>
-      {message.files && message.files.length > 0 ? (
-        <div className="mt-3 rounded-md border border-border bg-background/70 p-3">
-          <p className="text-[11px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
-            Attached files
+    <span className="inline-block min-w-4 text-muted-foreground" aria-hidden>
+      {".".repeat(frame)}
+    </span>
+  );
+}
+
+function MessageRow({ message, onRetry }: { message: ChatMessage; onRetry?: () => void }) {
+  const isUser = message.role === "user";
+  const rowClassName = isUser ? "flex justify-end" : "flex justify-start";
+  const cardClassName =
+    message.role === "assistant"
+      ? "w-full rounded-xl border border-border bg-background p-4"
+      : message.role === "system"
+        ? "w-full rounded-xl border border-border bg-muted/60 p-4"
+        : "w-full max-w-[70%] rounded-2xl bg-muted/20 p-4";
+
+  return (
+    <div className={rowClassName}>
+      <article className={cardClassName}>
+        <header className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold tracking-[0.12em] uppercase text-muted-foreground">
+            {roleLabel(message.role)}
+            {message.pending ? " (streaming)" : message.deliveryStatus === "sending" ? " (sending)" : ""}
           </p>
-          <ul className="mt-2 space-y-2">
-            {message.files.map((file) => (
-              <li key={file.id} className="text-xs">
-                <a
-                  href={file.downloadPath}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-foreground underline underline-offset-2"
-                >
-                  {file.originalName}
-                </a>
-                <p className="mt-0.5 break-all text-muted-foreground">{file.storagePath}</p>
-              </li>
-            ))}
-          </ul>
+          <p className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</p>
+        </header>
+        <div className="text-sm leading-6">
+          <MessageMarkdown content={message.content} />
+          {message.role === "assistant" && message.pending ? <StreamingTrail /> : null}
         </div>
-      ) : null}
-      {message.deliveryStatus === "failed" ? (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
-          <p className="text-xs text-muted-foreground">Failed to send</p>
-          <button
-            type="button"
-            className="rounded-md border border-border px-2 py-1 text-xs font-medium transition hover:bg-muted"
-            onClick={onRetry}
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-    </article>
+        {message.files && message.files.length > 0 ? (
+          <div className="mt-3 rounded-md border border-border bg-background/70 p-3">
+            <p className="text-[11px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
+              Attached files
+            </p>
+            <ul className="mt-2 space-y-2">
+              {message.files.map((file) => (
+                <li key={file.id} className="text-xs">
+                  <a
+                    href={file.downloadPath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-foreground underline underline-offset-2"
+                  >
+                    {file.originalName}
+                  </a>
+                  <p className="mt-0.5 break-all text-muted-foreground">{file.storagePath}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {message.deliveryStatus === "failed" ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+            <p className="text-xs text-muted-foreground">Failed to send</p>
+            <button
+              type="button"
+              className="rounded-md border border-border px-2 py-1 text-xs font-medium transition hover:bg-muted"
+              onClick={onRetry}
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+      </article>
+    </div>
   );
 }

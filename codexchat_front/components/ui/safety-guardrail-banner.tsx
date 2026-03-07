@@ -43,6 +43,7 @@ export default function SafetyGuardrailBanner() {
   const router = useRouter();
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number>(0);
 
   useEffect(() => {
     let mounted = true;
@@ -69,6 +70,7 @@ export default function SafetyGuardrailBanner() {
           return;
         }
 
+        setActiveIndex(0);
         setSettings(payload.settings);
       } catch {
         // Keep page usable when settings fetch fails.
@@ -82,51 +84,73 @@ export default function SafetyGuardrailBanner() {
     };
   }, [apiBaseUrl, router]);
 
-  if (!settings) {
-    return null;
-  }
+  const cards = useMemo<Array<{ key: string; title: string; content: string; severity: WarningPayload["severity"] }>>(() => {
+    if (!settings) {
+      return [];
+    }
 
-  const cards: Array<{ key: string; title: string; content: string; severity: WarningPayload["severity"] }> = [];
+    const nextCards: Array<{ key: string; title: string; content: string; severity: WarningPayload["severity"] }> = [];
 
-  cards.push({
-    key: settings.destructive_operations_warning.id,
-    title: settings.destructive_operations_warning.title,
-    content: settings.destructive_operations_warning.content,
-    severity: settings.destructive_operations_warning.severity,
-  });
-
-  if (settings.execution_mode_default === "yolo") {
-    cards.push({
-      key: settings.yolo_mode_warning.id,
-      title: settings.yolo_mode_warning.title,
-      content: settings.yolo_mode_warning.content,
-      severity: settings.yolo_mode_warning.severity,
+    nextCards.push({
+      key: settings.destructive_operations_warning.id,
+      title: settings.destructive_operations_warning.title,
+      content: settings.destructive_operations_warning.content,
+      severity: settings.destructive_operations_warning.severity,
     });
-  }
 
-  if (settings.shared_workspace_warning.enabled) {
-    cards.push({
-      key: "shared-workspace-notice",
-      title: "Shared Workspace Notice",
-      content: settings.shared_workspace_warning.content,
-      severity: "critical",
-    });
-  }
+    if (settings.execution_mode_default === "yolo") {
+      nextCards.push({
+        key: settings.yolo_mode_warning.id,
+        title: settings.yolo_mode_warning.title,
+        content: settings.yolo_mode_warning.content,
+        severity: settings.yolo_mode_warning.severity,
+      });
+    }
+
+    if (settings.shared_workspace_warning.enabled) {
+      nextCards.push({
+        key: "shared-workspace-notice",
+        title: "Shared Workspace Notice",
+        content: settings.shared_workspace_warning.content,
+        severity: "critical",
+      });
+    }
+
+    return nextCards;
+  }, [settings]);
+
+  useEffect(() => {
+    if (cards.length === 0 || activeIndex >= cards.length) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setActiveIndex((previous) => previous + 1);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, cards.length]);
 
   if (cards.length === 0) {
     return null;
   }
 
+  const activeCard = cards[activeIndex];
+  if (!activeCard) {
+    return null;
+  }
+
   return (
-    <section className="mx-auto mt-4 w-full max-w-7xl px-4 sm:px-6">
-      <div className="space-y-2">
-        {cards.map((card) => (
-          <article key={card.key} className={`${BANNER_BASE} ${toneClass(card.severity)}`}>
-            <p className="font-semibold">{card.title}</p>
-            <p className="mt-1 text-xs leading-relaxed opacity-90">{card.content}</p>
-          </article>
-        ))}
-      </div>
-    </section>
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4 sm:top-6">
+      <article
+        key={activeCard.key}
+        className={`${BANNER_BASE} w-full max-w-7xl shadow-sm ${toneClass(activeCard.severity)}`}
+        role="status"
+        aria-live="polite"
+      >
+        <p className="font-semibold">{activeCard.title}</p>
+        <p className="mt-1 text-xs leading-relaxed opacity-90">{activeCard.content}</p>
+      </article>
+    </div>
   );
 }

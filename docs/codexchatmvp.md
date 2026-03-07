@@ -30,6 +30,7 @@ Minimum safety expectations:
   - Left sidebar: conversation list + “New chat”
   - Main pane: messages, streaming responses, code blocks, copy buttons
   - Input box with multiline + send
+  - Composer controls use recognizable icons (message, attachment, send)
   - Fully responsive on desktop + mobile (ChatGPT-like behavior on both)
 - Authentication:
   - Email + password login
@@ -286,6 +287,7 @@ Later:
 - Input:
   - Multiline textarea
   - Attachment button (camera/files on mobile, files on desktop)
+  - Message/attachment/send controls use iconography for fast recognition
   - Enter to send, Shift+Enter newline
   - Disable while response in progress (or allow interrupt later)
 
@@ -295,6 +297,7 @@ Later:
   - Sidebar hidden by default, opened via hamburger menu
   - Sidebar opens as full-screen drawer
   - Message composer fixed at bottom with safe-area support
+  - Composer adjusts for on-screen keyboards on iOS/Android so the active typing area remains visible
   - Comfortable tap targets and readable spacing/typography
 - New chat + resume existing chat must work cleanly on both desktop and mobile
 
