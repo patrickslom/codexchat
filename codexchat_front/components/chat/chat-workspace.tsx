@@ -90,6 +90,13 @@ type AttachmentDraft = {
 };
 
 const DEFAULT_UPLOAD_LIMIT_MB = 15;
+const ATTACHMENT_NAME_BASE_MAX_CHARS = 15;
+const PREVIEWABLE_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
 
 type ChatEvent =
   | AssistantDeltaEvent
@@ -322,6 +329,32 @@ function formatFileSize(bytes: number): string {
   }
 
   return `${(mib / 1024).toFixed(1)} GB`;
+}
+
+function formatAttachmentName(filename: string): string {
+  const trimmed = filename.trim();
+  if (!trimmed) {
+    return "file";
+  }
+
+  const lastDot = trimmed.lastIndexOf(".");
+  const hasExtension = lastDot > 0 && lastDot < trimmed.length - 1;
+  const baseName = hasExtension ? trimmed.slice(0, lastDot) : trimmed;
+  const extension = hasExtension ? trimmed.slice(lastDot + 1) : "";
+
+  if (baseName.length <= ATTACHMENT_NAME_BASE_MAX_CHARS) {
+    return trimmed;
+  }
+
+  const truncatedBase = baseName.slice(0, ATTACHMENT_NAME_BASE_MAX_CHARS);
+  return extension ? `${truncatedBase}...${extension}` : `${truncatedBase}...`;
+}
+
+function isPreviewableImage(file: ChatMessageFile): boolean {
+  if (!file.mimeType) {
+    return false;
+  }
+  return PREVIEWABLE_IMAGE_MIME_TYPES.has(file.mimeType.toLowerCase());
 }
 
 function isLikelyNetworkFailure(error: unknown): boolean {
@@ -2097,7 +2130,7 @@ function ComposerPanel({
             <ul className="mt-3 flex flex-wrap gap-2">
               {selectedAttachments.map((draft) => (
                 <li key={draft.id} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs">
-                  <span className="max-w-[12rem] truncate">{draft.file.name}</span>
+                  <span title={draft.file.name}>{formatAttachmentName(draft.file.name)}</span>
                   <span className="text-muted-foreground">{formatFileSize(draft.file.size)}</span>
                   <button
                     type="button"
@@ -2182,13 +2215,32 @@ function MessageRow({ message, onRetry }: { message: ChatMessage; onRetry?: () =
             <ul className="mt-2 space-y-2">
               {message.files.map((file) => (
                 <li key={file.id} className="text-xs">
+                  {isPreviewableImage(file) ? (
+                    <a
+                      href={file.downloadPath}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mb-2 inline-block"
+                      aria-label={`Open image ${file.originalName}`}
+                    >
+                      {/* next/image proxy fetch can drop auth cookie for protected file endpoints. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={file.downloadPath}
+                        alt={file.originalName}
+                        loading="lazy"
+                        className="h-20 w-20 rounded-md border border-border object-cover"
+                      />
+                    </a>
+                  ) : null}
                   <a
                     href={file.downloadPath}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-foreground underline underline-offset-2"
+                    title={file.originalName}
                   >
-                    {file.originalName}
+                    {formatAttachmentName(file.originalName)}
                   </a>
                   <p className="mt-0.5 break-all text-muted-foreground">{file.storagePath}</p>
                 </li>
