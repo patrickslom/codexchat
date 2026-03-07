@@ -18,7 +18,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const response = NextResponse.redirect(new URL("/login?logged_out=1", request.url));
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: {
+      location: "/?logged_out=1",
+    },
+  });
 
   for (const cookieName of SESSION_COOKIE_KEYS) {
     response.cookies.set(cookieName, "", {

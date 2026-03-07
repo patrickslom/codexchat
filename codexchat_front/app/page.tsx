@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import WinkingLogo from "./components/winking-logo";
+import HomeLogoutToast from "./components/home-logout-toast";
 import { getAuthenticatedUser } from "@/lib/auth-session";
 
-export default async function Home() {
+type HomePageProps = {
+  searchParams: Promise<{ logged_out?: string }>;
+};
+
+export default async function Home({ searchParams }: HomePageProps) {
   if (await getAuthenticatedUser()) {
     redirect("/chat");
   }
 
+  const params = await searchParams;
+  const wasLoggedOut = params.logged_out === "1";
+
   return (
     <main className="min-h-screen bg-background px-6 py-20 text-foreground">
+      <HomeLogoutToast show={wasLoggedOut} />
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-8">
         <div className="flex items-center gap-3">
           <WinkingLogo />

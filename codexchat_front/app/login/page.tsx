@@ -4,17 +4,10 @@ import WinkingLogo from "../components/winking-logo";
 import { getAuthenticatedUser } from "@/lib/auth-session";
 import LoginForm from "./login-form";
 
-type LoginPageProps = {
-  searchParams: Promise<{ logged_out?: string }>;
-};
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function LoginPage() {
   if (await getAuthenticatedUser()) {
     redirect("/chat");
   }
-
-  const params = await searchParams;
-  const wasLoggedOut = params.logged_out === "1";
 
   return (
     <section className="mx-auto flex min-h-screen min-h-dvh w-full max-w-md items-center px-6 py-12">
@@ -32,12 +25,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Continue to a new chat and resume previous conversations from your
           sidebar history.
         </p>
-
-        {wasLoggedOut ? (
-          <p className="mt-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200">
-            You have been logged out.
-          </p>
-        ) : null}
 
         <LoginForm />
 
